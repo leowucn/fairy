@@ -2,7 +2,7 @@ import cheerio from 'cheerio'
 import async from 'async'
 import _ from 'lodash'
 import autoBind from 'auto-bind'
-import mongodb from 'mongodb'
+import bluebird from 'bluebird'
 import serverConfig from '../../config'
 import database from '../database'
 import util from '../../util/util'
@@ -17,7 +17,7 @@ class AlbumMusic {
       const $ = cheerio.load(response, { decodeEntities: false })
       $('#song-list-pre-cache').find('a').each(function (i, elem) {          // eslint-disable-line
         const musicId = util.getNumberStringFromString($(this).attr('href'))
-        let musicRegistration = {}
+        const musicRegistration = {}
         musicRegistration.id = musicId
         musicRegistration.name = $(this).html()
         musicRegistration.artistId = album.artistId
@@ -29,33 +29,39 @@ class AlbumMusic {
   }
 
   callGetAllMusicRegistrationOfAlbums(outerCallback) {
-    console.log(11)
     const currentThis = this
     const tasks = []
+    const bluebirdTasks = []
     let index = 0
-    console.log(22)
-    database.getAllAlbumRegistration(allAlbumRegistration => {
-      console.log(33)
-      console.log('44, allAlbumRegistration.length = ', allAlbumRegistration.length)
+    database.getAllAlbumRegistration(async (allAlbumRegistration) => {
       _.forEach(allAlbumRegistration, (album) => {
-        // if (!util.ifShouldUpdateData(`album-music-${album.id}`)) {
-        //   return
-        // }
-        console.log(44)
-        const f = (callback) => {
-          currentThis.getMusicListOfAlbum(album, index, allAlbumRegistration.length, callback)
-          index++
-        }
-        tasks.push(f)
+        bluebirdTasks.push(
+          new bluebird.Promise((rev) => {
+            util.ifShouldUpdateData(`album-music-${album.id}`, shouldUpdate => {
+              if (!shouldUpdate) {
+                rev()
+                return
+              }
+              const f = (callback) => {
+                currentThis.getMusicListOfAlbum(album, index, allAlbumRegistration.length, callback)
+                index++
+              }
+              tasks.push(f)
+              rev()
+            })
+          })
+        )
       })
       util.printMsgV1('Begin getting music information of all albums...')
-      async.parallelLimit(tasks, serverConfig.maxConcurrentNumOfAlbumsForGetMusicInfo, (err) => {
-        if (err) {
-          util.errMsg(err)
-          return
-        }
-        util.printMsgV1('Finish getting music information of all albums!')
-        outerCallback()
+      await bluebird.Promise.all(bluebirdTasks).then(() => {
+        async.parallelLimit(tasks, serverConfig.maxConcurrentNumOfAlbumsForGetMusicInfo, (err) => {
+          if (err) {
+            util.errMsg(err)
+            return
+          }
+          util.printMsgV1('Finish getting music information of all albums!')
+          outerCallback()
+        })
       })
     })
   }

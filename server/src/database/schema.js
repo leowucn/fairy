@@ -62,7 +62,7 @@ const dataDateInfo = mongoose.model(COLLECTIONS.COLLECTION_DATA_DATE_INFO, new S
 }));
 
 
-export const schemaDef = {
+const schemaDef = {
   playlistInfo,
   playlistProperty,
   musicRegistration,
@@ -71,3 +71,4 @@ export const schemaDef = {
   dataDateInfo,
 }
 
+export default schemaDef;

@@ -1,7 +1,7 @@
 import autoBind from 'auto-bind'
-import mongodb from 'mongodb'
 import async from 'async'
 import _ from 'lodash'
+import bluebird from 'bluebird'
 import util from '../../util/util'
 import serverConfig from '../../config'
 import { URL } from './constants'
@@ -75,25 +75,36 @@ class PlaylistProperty {
   callUpdateAllPlaylistProperty(outerCallback) {
     const currentThis = this
     const tasks = []
+    const bluebirdTasks = []
     let index = 0
-    database.getAllPlaylistInfos((allPlaylistInfos) => {
+    database.getAllPlaylistInfos(async (allPlaylistInfos) => {
       _.forEach(allPlaylistInfos, (item) => {
-        // if (!util.ifShouldUpdateData(`playlist-property-${item.playlist}`)) {
-        //   return
-        // }
-        const f = (cb) => {
-          currentThis.getPlaylistProperty(item, index, allPlaylistInfos.length, cb)
-          index++
-        }
-        tasks.push(f)
+        bluebirdTasks.push(
+          new bluebird.Promise((rev) => {
+            util.ifShouldUpdateData(`playlist-property-${item.playlist}`, shouldUpdate => {
+              if (!shouldUpdate) {
+                rev()
+                return
+              }
+              const f = (cb) => {
+                currentThis.getPlaylistProperty(item, index, allPlaylistInfos.length, cb)
+                index++
+              }
+              tasks.push(f)
+              rev()
+            })
+          })
+        )
       })
       util.printMsgV1('Begin upsert play list property finish!')
-      async.parallelLimit(tasks, serverConfig.maxConcurrentNumGetPlaylistProperty, (err) => {
-        if (err) {
-          util.errMsg(err)
-        }
-        util.printMsgV1('Finish upsert play list property finish!')
-        outerCallback()
+      await bluebird.Promise.all(bluebirdTasks).then(() => {
+        async.parallelLimit(tasks, serverConfig.maxConcurrentNumGetPlaylistProperty, (err) => {
+          if (err) {
+            util.errMsg(err)
+          }
+          util.printMsgV1('Finish upsert play list property finish!')
+          outerCallback()
+        })
       })
     })
   }

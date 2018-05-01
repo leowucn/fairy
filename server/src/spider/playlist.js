@@ -2,7 +2,7 @@ import cheerio from 'cheerio'
 import async from 'async'
 import _ from 'lodash'
 import autoBind from 'auto-bind'
-import mongodb from 'mongodb'
+import bluebird from 'bluebird'
 import { MUSIC_STYLE } from './constants'
 import serverConfig from '../../config'
 import util from '../../util/util'
@@ -127,30 +127,38 @@ class Playlist {
   /**
    * 获取所有音乐风格的歌单列表
    */
-  callGetPlaylistsForAllMusicStyle(outerCallback) {
+  async callGetPlaylistsForAllMusicStyle(outerCallback) {
     const tasks = []
     const currentThis = this
+    const bluebirdTasks = []
     _.forEach(MUSIC_STYLE, (v) => {
-      // console.log(11)
-      // if (!util.ifShouldUpdateData(`playlist-${v}`)) {
-      //   console.log(22)
-      //   return
-      // }
-      // console.log(33)
-      const f = (callback) => {
-        util.printMsgV1(`Prepare for the next data of music style ${v}...`)      // eslint-disable-line
-        currentThis.wrapperGetPlaylistsByMusicStyle(v, callback)
-      }
-      tasks.push(f)
+      bluebirdTasks.push(
+        new bluebird.Promise((rev) => {
+          util.ifShouldUpdateData(`playlist-${v}`, shouldUpdate => {
+            if (!shouldUpdate) {
+              rev()
+              return
+            }
+            const f = (callback) => {
+              util.printMsgV1(`Prepare for the next data of music style ${v}...`)      // eslint-disable-line
+              currentThis.wrapperGetPlaylistsByMusicStyle(v, callback)
+            }
+            tasks.push(f)
+            rev()
+          })
+        })
+      )
     })
 
-    async.waterfall(tasks, (err) => {
-      if (err) {
-        util.errMsg(err)
-        return
-      }
-      util.printMsgV1('fetch play lists over!')      // eslint-disable-line
-      outerCallback()
+    await bluebird.Promise.all(bluebirdTasks).then(() => {
+      async.waterfall(tasks, (err) => {
+        if (err) {
+          util.errMsg(err)
+          return
+        }
+        util.printMsgV1('fetch play lists over!')      // eslint-disable-line
+        outerCallback()
+      })
     })
   }
 

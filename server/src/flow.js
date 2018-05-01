@@ -1,6 +1,5 @@
 import _ from 'lodash'
 import async from 'async'
-import { database } from './global'
 import util from '../util/util'
 
 import playlist from './spider/playlist'  // 测试使用
@@ -14,13 +13,13 @@ import albumMusic from './spider/album-music'
 export function run() {
   // --------------- 并发1阶段---------------
   const firstStageFuncs = [
-    // playlist.callGetPlaylistsForAllMusicStyle,
+    playlist.callGetPlaylistsForAllMusicStyle,
     artist.callGetAllArtistInfo,
   ]
 
   // --------------- 并发2阶段---------------
   const seconddStageFuncs = [
-    // playlistProperty.callUpdateAllPlaylistProperty,
+    playlistProperty.callUpdateAllPlaylistProperty,
     albumList.callGetAlbumListForAllArtist,
   ]
 

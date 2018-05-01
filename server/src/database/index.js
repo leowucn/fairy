@@ -1,7 +1,5 @@
-import async from 'async'
-import { schemaDef } from './schema'
+import schemaDef from './schema'
 import autoBind from 'auto-bind'
-import _ from 'lodash'
 import util from '../../util/util'
 
 
@@ -130,6 +128,15 @@ class Database {
   }
   getAllDataDateInfo(callback) {
     schemaDef.dataDateInfo.find({}, (err, res) => {
+      if (err) {
+        util.errMsg(err)
+        return
+      }
+      callback(res)
+    })
+  }
+  getDataDateInfoByName(name, callback) {
+    schemaDef.dataDateInfo.findOne({ name }, (err, res) => {
       if (err) {
         util.errMsg(err)
         return

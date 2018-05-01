@@ -1,6 +1,7 @@
 import autoBind from 'auto-bind'
 import _ from 'lodash'
 import async from 'async'
+import bluebird from 'bluebird'
 import util from '../../util/util'
 import serverConfig from '../../config'
 import database from '../database'
@@ -16,30 +17,41 @@ class Music {
       updatedMusicRegistration.commentCount = response.total
       database.upsertMusicRegistration(updatedMusicRegistration)
       util.printMsgV2(`update music name = ${musicRegistration.name}, index = ${index}, total = ${total}`)
-      callback()
+      outerCallback()
     })
   }
   callUpdateAllMusicInfo(outerCallback) {
     const tasks = []
+    const bluebirdTasks = []
     let index = 0
-    database.getAllMusicRegistration(allMusicRegistration => {
+    database.getAllMusicRegistration(async (allMusicRegistration) => {
       _.forEach(allMusicRegistration, (item) => {
-        // if (!util.ifShouldUpdateData(`music-${item.id}`)) {
-        //   return
-        // }
-        const f = (callback) => {
-          this.updateMusicInfo(item, index, allMusicRegistration.length, callback)
-          index++
-        }
-        tasks.push(f)
+        bluebirdTasks.push(
+          new bluebird.Promise((rev) => {
+            util.ifShouldUpdateData(`music-${item.id}`, shouldUpdate => {
+              if (!shouldUpdate) {
+                rev()
+                return
+              }
+              const f = (callback) => {
+                this.updateMusicInfo(item, index, allMusicRegistration.length, callback)
+                index++
+              }
+              tasks.push(f)
+              rev()
+            })
+          })
+        )
       })
       util.printMsgV1('Begin update music comment information!')
-      async.parallelLimit(tasks, serverConfig.maxConcurrentNumOfMusicForGetMusicInfo, (err) => {
-        if (err) {
-          util.errMsg(err)
-        }
-        util.printMsgV1('Finish updating music comment information!')
-        outerCallback()
+      await bluebird.Promise.all(bluebirdTasks).then(() => {
+        async.parallelLimit(tasks, serverConfig.maxConcurrentNumOfMusicForGetMusicInfo, (err) => {
+          if (err) {
+            util.errMsg(err)
+          }
+          util.printMsgV1('Finish updating music comment information!')
+          outerCallback()
+        })
       })
     })
   }

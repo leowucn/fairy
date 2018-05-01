@@ -15,7 +15,7 @@ require('./main.css');
 export default function App(props) {
   return (
     <Provider store={props.store}>
-      <IntlWrapper>
+      <IntlWrapper locale="en">
         <Router history={browserHistory}>
           {routes}
         </Router>

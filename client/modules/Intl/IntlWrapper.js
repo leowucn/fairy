@@ -4,7 +4,7 @@ import { connect } from 'react-redux';
 
 export function IntlWrapper(props) {
   return (
-    <IntlProvider {...props.intl} >
+    <IntlProvider {...props.intl} locale="en">
       {props.children}
     </IntlProvider>
   );

@@ -1,8 +1,8 @@
 import autoBind from 'auto-bind'
-import mongodb from 'mongodb'
 import _ from 'lodash'
 import cheerio from 'cheerio'
 import async from 'async'
+import bluebird from 'bluebird'
 import util from '../../util/util'
 import serverConfig from '../../config'
 import { ARTIST_CLASS } from './constants'
@@ -54,24 +54,35 @@ class Artist {
     })
   }
 
-  callGetAllArtistInfo(outerCallback) {
+  async callGetAllArtistInfo(outerCallback) {
     const tasks = []
+    const bluebirdTasks = []
     _.forEach(ARTIST_CLASS, (v, k) => {
-      // if (!util.ifShouldUpdateData(`artis-${v}`)) {
-      //   return
-      // }
-      const f = (callback) => {
-        this.assignTaskByDiffPrefixOfName(k, callback)
-      }
-      tasks.push(f)
+      bluebirdTasks.push(
+        new bluebird.Promise((rev) => {
+          util.ifShouldUpdateData(`artist-${v}`, shouldUpdate => {
+            if (!shouldUpdate) {
+              rev()
+              return
+            }
+            const f = (callback) => {
+              this.assignTaskByDiffPrefixOfName(k, callback)
+            }
+            tasks.push(f)
+            rev()
+          })
+        })
+      )
     })
     util.printMsgV1('Begin getting all of the artists information!')
-    async.series(tasks, (err) => {
-      if (err) {
-        util.errMsg(err)
-      }
-      util.printMsgV1('Finish getting all of the artists information!')
-      outerCallback()
+    await bluebird.Promise.all(bluebirdTasks).then(() => {
+      async.series(tasks, (err) => {
+        if (err) {
+          util.errMsg(err)
+        }
+        util.printMsgV1('Finish getting all of the artists information!')
+        outerCallback()
+      })
     })
   }
 }

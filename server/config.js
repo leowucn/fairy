@@ -13,7 +13,9 @@ const config = {
   maxConcurrentNumOfAlbumsForGetMusicInfo: 20,    // 要并发从专辑抓取歌曲信息的最大专辑数目
   maxMsgLength: 80,                               // 表示在控制台打印的日志行的最大长度，此处假设日志长度不大于屏幕的最大宽度，理论上我不会使用这么长的日志
 
-  updateIntervalDays: 10 * 86400000,              // 隔多少天更新数据
+  updateIntervalDays: 10 * 8.64e+7,               // 隔多少毫秒后更新数据，默认10天
+
+  musicCountPerPage: 2,                          // 给客户端每次请求排行榜显示多少数据
 
 
   options: {

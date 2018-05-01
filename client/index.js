@@ -8,7 +8,7 @@ import App from './App';
 import { configureStore } from './store';
 
 // Initialize store
-const store = configureStore(window.__INITIAL_STATE__);
+const store = configureStore(window.__INITIAL_STATE__);     // eslint-disable-line
 const mountApp = document.getElementById('root');
 
 render(

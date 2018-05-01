@@ -2,7 +2,7 @@ import cheerio from 'cheerio'
 import async from 'async'
 import _ from 'lodash'
 import autoBind from 'auto-bind'
-import mongodb from 'mongodb'
+import bluebird from 'bluebird'
 import serverConfig from '../../config'
 import util from '../../util/util'
 import database from '../database'
@@ -64,24 +64,36 @@ class AlbumList {
     })
   }
 
-  callGetAlbumListForAllArtist() {
+  callGetAlbumListForAllArtist(outerCallback) {
     const tasks = []
-    database.getAllArtistRegistration((allArtistRegistration) => {
+    const bluebirdTasks = []
+    database.getAllArtistRegistration(async (allArtistRegistration) => {
       _.forEach(allArtistRegistration, (artistInfo, index) => {
-        // if (!util.ifShouldUpdateData(`album-list-${artistInfo.id}`)) {
-        //   return
-        // }
-        const f = (callback) => {
-          this.getAlbumListForArtist(artistInfo.id, index, allArtistRegistration.length, callback)
-        }
-        tasks.push(f)
+        bluebirdTasks.push(
+          new bluebird.Promise((rev) => {
+            util.ifShouldUpdateData(`album-list-${artistInfo.id}`, shouldUpdate => {
+              if (!shouldUpdate) {
+                rev()
+                return
+              }
+              const f = (callback) => {
+                this.getAlbumListForArtist(artistInfo.id, index, allArtistRegistration.length, callback)
+              }
+              tasks.push(f)
+              rev()
+            })
+          })
+        )
       })
       util.printMsgV1('Begin getting albums list of each artist...')
-      async.parallelLimit(tasks, serverConfig.maxConcurrentNumOfSingerForGetAlbum, (err) => {
-        if (err) {
-          util.errMsg(err)
-        }
-        util.printMsgV1('Finish getting albums list of each artist!')
+      await bluebird.Promise.all(bluebirdTasks).then(() => {
+        async.parallelLimit(tasks, serverConfig.maxConcurrentNumOfSingerForGetAlbum, (err) => {
+          if (err) {
+            util.errMsg(err)
+          }
+          util.printMsgV1('Finish getting albums list of each artist!')
+          outerCallback()
+        })
       })
     })
   }
