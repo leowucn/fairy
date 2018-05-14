@@ -11,20 +11,24 @@ class AlbumMusic {
   constructor() {
     autoBind(this)
   }
-  getMusicListOfAlbum(album, index, total, outerCallback) {
+  getMusicListOfAlbum(album, index, total, outerCallback, callbackForUpdate) {
     const albumUrl = util.getAlbumUrl(album.id)
-    util.getHtmlSourceCodeWithGetMethod(albumUrl).then((response) => {
+    util.getHtmlSourceCodeWithGetMethod(albumUrl).then(async (response) => {
       const $ = cheerio.load(response, { decodeEntities: false })
       $('#song-list-pre-cache').find('a').each(function (i, elem) {          // eslint-disable-line
-        const musicId = util.getNumberStringFromString($(this).attr('href'))
-        const musicRegistration = {}
-        musicRegistration.id = musicId
-        musicRegistration.name = $(this).html()
-        musicRegistration.artistId = album.artistId
-        database.upsertMusicRegistration(musicRegistration)
+        database.getArtistNameByArtistId(album.artistId, artistName => {
+          const musicId = util.getNumberStringFromString($(this).attr('href'))
+          const musicRegistration = {}
+          musicRegistration.id = musicId
+          musicRegistration.name = $(this).html()
+          musicRegistration.artistId = album.artistId
+          musicRegistration.artistName = artistName
+          database.upsertMusicRegistration(musicRegistration)
+        })
       });
       util.printMsgV2(`finish album ${album.name} which index = ${index}, total = ${total}`)
       outerCallback()
+      callbackForUpdate()
     })
   }
 
@@ -37,13 +41,16 @@ class AlbumMusic {
       _.forEach(allAlbumRegistration, (album) => {
         bluebirdTasks.push(
           new bluebird.Promise((rev) => {
-            util.ifShouldUpdateData(`album-music-${album.id}`, shouldUpdate => {
+            const name = `album-music-${album.id}`
+            util.ifShouldUpdateData(name, shouldUpdate => {
               if (!shouldUpdate) {
                 rev()
                 return
               }
               const f = (callback) => {
-                currentThis.getMusicListOfAlbum(album, index, allAlbumRegistration.length, callback)
+                currentThis.getMusicListOfAlbum(album, index, allAlbumRegistration.length, callback, () => {
+                  util.updateDataDateInfo(name)
+                })
                 index++
               }
               tasks.push(f)

@@ -10,7 +10,7 @@ class Music {
   constructor() {
     autoBind(this)
   }
-  updateMusicInfo(musicRegistration, index, total, outerCallback) {
+  updateMusicInfo(musicRegistration, index, total, outerCallback, callbackForUpdate) {
     const musicCommentUrl = util.getMusicCommentUrl(musicRegistration.id)
     util.getHtmlSourceCodeWithGetMethod(musicCommentUrl).then((response) => {
       const updatedMusicRegistration = musicRegistration
@@ -18,6 +18,7 @@ class Music {
       database.upsertMusicRegistration(updatedMusicRegistration)
       util.printMsgV2(`update music name = ${musicRegistration.name}, index = ${index}, total = ${total}`)
       outerCallback()
+      callbackForUpdate()
     })
   }
   callUpdateAllMusicInfo(outerCallback) {
@@ -28,13 +29,16 @@ class Music {
       _.forEach(allMusicRegistration, (item) => {
         bluebirdTasks.push(
           new bluebird.Promise((rev) => {
-            util.ifShouldUpdateData(`music-${item.id}`, shouldUpdate => {
+            const name = `music-${item.id}`
+            util.ifShouldUpdateData(name, shouldUpdate => {
               if (!shouldUpdate) {
                 rev()
                 return
               }
               const f = (callback) => {
-                this.updateMusicInfo(item, index, allMusicRegistration.length, callback)
+                this.updateMusicInfo(item, index, allMusicRegistration.length, callback, () => {
+                  util.updateDataDateInfo(name)
+                })
                 index++
               }
               tasks.push(f)

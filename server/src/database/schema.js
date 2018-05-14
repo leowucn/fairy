@@ -26,20 +26,21 @@ const playlistProperty = mongoose.model(COLLECTIONS.COLLECTION_PLAY_LIST_PROPERT
 
 // musicRegistration model
 const musicRegistration = mongoose.model(COLLECTIONS.COLLECTION_MUSIC_REGISTRATION, new Schema({
-  id: { type: 'String', required: true },                // 歌曲id
-  name: { type: 'String', required: true },              // 歌曲名称
+  id: { type: 'String', required: true },                 // 歌曲id
+  name: { type: 'String', required: true },               // 歌曲名称
   playlist: { type: 'String', required: false },          // 所属歌单地址后缀
-  artistId: { type: 'String', required: false },         // 所属音乐人的id
-  commentCount: { type: 'Number', required: false },     // 评论总数
+  artistName: { type: 'String', required: false },        // 所属音乐人的名字
+  duration: { type: 'String', required: false },         // 时长
+  commentCount: { type: 'Number', required: false },      // 评论总数
 }, {
   versionKey: false, // You should be aware of the outcome after set to false
 }));
 
 // artistRegistration model
 const artistRegistration = mongoose.model(COLLECTIONS.COLLECTION_ARTIST_REGISTRATION, new Schema({
-  id: { type: 'String', required: true },                // 歌手id
-  name: { type: 'String', required: true },              // 歌手名称
-  artistClass: { type: 'String', required: true },       // 所属歌手类别分类，地址后缀形式表示
+  id: { type: 'String', required: true },                 // 歌手id
+  name: { type: 'String', required: true },               // 歌手名称
+  artistClass: { type: 'String', required: true },        // 所属歌手类别分类，地址后缀形式表示
 }, {
   versionKey: false, // You should be aware of the outcome after set to false
 }));

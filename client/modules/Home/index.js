@@ -9,6 +9,8 @@ import List, { ListItem } from 'material-ui/List';
 import Typography from 'material-ui/Typography';
 import Divider from 'material-ui/Divider';
 
+import MusicList from './musicList'
+
 import { getRanks } from './service'
 
 const drawerWidth = 240;
@@ -96,7 +98,7 @@ class Home extends React.Component {
   render() {
     const { classes } = this.props;
     const { currentRank, rankUpdateDate } = this.state;
-    // console.log('00, currentRank = ', currentRank)
+    console.log('00, currentRank = ', currentRank)
     // console.log('00, date = ', new Date(rankUpdateDate).toISOString())
     const message = [currentRank.title, new Date(rankUpdateDate).toISOString().split('T')[0]].join('   ')
 
@@ -141,7 +143,7 @@ class Home extends React.Component {
           {drawer}
           <main className={classes.content}>
             <div className={classes.toolbar} />
-            <Typography>{'You think water moves fast? You should see ice.'}</Typography>
+            <MusicList data={currentRank.data || []} />
           </main>
         </div>
       </div>

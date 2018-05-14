@@ -18,7 +18,7 @@ class PlaylistProperty {
    * @param {*} index           当前歌单再批量任务中的索引，用于日志显示使用
    * @param {*} outerCallback   外部传进来的用于异步库async进行流程控制的回调函数
    */
-  getPlaylistProperty(playlistInfo, index, total, outerCallback) {
+  getPlaylistProperty(playlistInfo, index, total, outerCallback, callbackForUpdate) {
     const currentThis = this
     const playlistUrl = URL.URL_MUSIC.concat(util.getNumberStringFromString(playlistInfo.playlist))
     util.getHtmlSourceCodeWithGetMethod(playlistUrl).then((htmlSourceCode) => {
@@ -27,6 +27,7 @@ class PlaylistProperty {
       currentThis.parseMusicList(resObj, playlistInfo.playlist)
       util.printMsgV1(`update playlist property index = ${index}, total = ${total}`)
       outerCallback()
+      callbackForUpdate()
       return ''
     }).catch((err) => {
       util.errMsg(err)
@@ -65,6 +66,8 @@ class PlaylistProperty {
       musicRegistration.id = item.id
       musicRegistration.name = item.name
       musicRegistration.playlist = playlist
+      musicRegistration.artistName = _.map(item.artists, 'name').join('/')
+      musicRegistration.duration = util.millisToMinutesAndSeconds(item.duration)
       database.upsertMusicRegistration(musicRegistration)
     })
   }
@@ -81,13 +84,16 @@ class PlaylistProperty {
       _.forEach(allPlaylistInfos, (item) => {
         bluebirdTasks.push(
           new bluebird.Promise((rev) => {
-            util.ifShouldUpdateData(`playlist-property-${item.playlist}`, shouldUpdate => {
+            const name = `playlist-property-${item.playlist}`
+            util.ifShouldUpdateData(name, shouldUpdate => {
               if (!shouldUpdate) {
                 rev()
                 return
               }
               const f = (cb) => {
-                currentThis.getPlaylistProperty(item, index, allPlaylistInfos.length, cb)
+                currentThis.getPlaylistProperty(item, index, allPlaylistInfos.length, cb, () => {
+                  util.updateDataDateInfo(name)
+                })
                 index++
               }
               tasks.push(f)

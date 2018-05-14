@@ -59,6 +59,7 @@
     "react/jsx-indent": 1,
     "react/jsx-filename-extension": 0,
     "react/jsx-no-target-blank": 0,
+    "react/no-multi-comp": 0,
     "react/require-extension": 0,
     "react/self-closing-comp": 0,
     "react/prefer-stateless-function": 0,

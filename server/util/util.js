@@ -1,7 +1,6 @@
 import axios from 'axios'
 import dateFormat from 'dateformat'
 import autoBind from 'auto-bind'
-import bluebird from 'bluebird'
 import { URL } from '../src/spider/constants'
 import serverConfig from '../config'
 import database from '../src/database'
@@ -93,20 +92,12 @@ class Util {
 
   ifShouldUpdateData(name, callback) {
     database.getDataDateInfoByName(name, (dataDateInfo) => {
-      const f = () => {
-        const newDataDateInfo = {}
-        newDataDateInfo.name = name
-        newDataDateInfo.date = (new Date()).getTime()
-        database.upsertDataDateInfo(newDataDateInfo)
-      }
       const nowMillseconds = (new Date()).getTime()
       if (!dataDateInfo) {
-        f()
         callback(true)
         return
       }
       if (nowMillseconds - dataDateInfo.date > serverConfig.updateIntervalDays) {
-        f()
         callback(true)
         return
       }
@@ -114,11 +105,19 @@ class Util {
     })
   }
 
-  dummyPromise() {
-    return new bluebird.Promise((rev) => {
-      rev()
-    })
+  updateDataDateInfo(name) {
+    const newDataDateInfo = {}
+    newDataDateInfo.name = name
+    newDataDateInfo.date = (new Date()).getTime()
+    database.upsertDataDateInfo(newDataDateInfo)
   }
+
+  millisToMinutesAndSeconds(millis) {
+    const minutes = Math.floor(millis / 60000);
+    const seconds = ((millis % 60000) / 1000).toFixed(0);
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`
+  }
+
 }
 
 export default new Util()

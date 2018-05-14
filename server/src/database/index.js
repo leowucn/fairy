@@ -97,6 +97,13 @@ class Database {
     })
   }
 
+  getArtistNameByArtistId(artistId, callback) {
+    schemaDef.artistRegistration.findOne({ id: artistId }, (err, res) => {
+      // 返回空表示可能音乐人那部分数据还没爬下来，等下次更新就会有了
+      callback(res ? res.name : '')
+    })
+  }
+
   // --------------------------------------------
   // albumRegistration
   upsertAlbumRegistration(data) {

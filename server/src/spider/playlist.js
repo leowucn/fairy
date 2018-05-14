@@ -81,14 +81,14 @@ class Playlist {
   /**
    * getPlaylistsByMusicStyle的包装函数，方便调用
    */
-  wrapperGetPlaylistsByMusicStyle(musicStyle, outerCallback) {
+  wrapperGetPlaylistsByMusicStyle(musicStyle, outerCallback, callbackForUpdateDateInfo) {
     const tasks = []
     const currentThis = this
     const f = function (callback) {      // eslint-disable-line
       currentThis.getPlaylistsByMusicStyle(musicStyle, callback)
     }
     tasks.push(f)
-    async.parallel(tasks, (err, result) => {
+    async.parallel(tasks, async (err, result) => {
       if (err) {
         util.errMsg(err)
         return
@@ -97,9 +97,8 @@ class Playlist {
       _.forEach(result[0].playlistInfo, (item) => {
         database.upsertPlaylistInfo(item)
       })
-      if (outerCallback) {
-        outerCallback()
-      }
+      outerCallback()
+      callbackForUpdateDateInfo()
     })
   }
 
@@ -134,14 +133,17 @@ class Playlist {
     _.forEach(MUSIC_STYLE, (v) => {
       bluebirdTasks.push(
         new bluebird.Promise((rev) => {
-          util.ifShouldUpdateData(`playlist-${v}`, shouldUpdate => {
+          const name = `playlist-${v}`
+          util.ifShouldUpdateData(name, shouldUpdate => {
             if (!shouldUpdate) {
               rev()
               return
             }
             const f = (callback) => {
               util.printMsgV1(`Prepare for the next data of music style ${v}...`)      // eslint-disable-line
-              currentThis.wrapperGetPlaylistsByMusicStyle(v, callback)
+              currentThis.wrapperGetPlaylistsByMusicStyle(v, callback, () => {
+                util.updateDataDateInfo(name)
+              })
             }
             tasks.push(f)
             rev()

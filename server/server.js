@@ -10,9 +10,9 @@ import webpack from 'webpack';
 import config from '../webpack.config.dev';
 import webpackDevMiddleware from 'webpack-dev-middleware';
 import webpackHotMiddleware from 'webpack-hot-middleware';
-// import { run } from './src/flow'
+import { run } from './src/flow'
 
-// run()
+run()
 
 // Initialize the Express App
 const app = new Express()

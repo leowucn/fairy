@@ -31,7 +31,7 @@ class Artist {
     })
   }
 
-  assignTaskByDiffPrefixOfName(artistClass, outerCallback) {
+  assignTaskByDiffPrefixOfName(artistClass, outerCallback, callbackForUpdate) {
     const tasks = []
     _.forEach(serverConfig.artistPrefixOfName, (item) => {
       let n = '0'
@@ -51,6 +51,7 @@ class Artist {
       }
       util.printMsgV2(`finish getting registration of artist class: ${ARTIST_CLASS[artistClass]}`)
       outerCallback()
+      callbackForUpdate()
     })
   }
 
@@ -60,13 +61,16 @@ class Artist {
     _.forEach(ARTIST_CLASS, (v, k) => {
       bluebirdTasks.push(
         new bluebird.Promise((rev) => {
-          util.ifShouldUpdateData(`artist-${v}`, shouldUpdate => {
+          const name = `artist-${v}`
+          util.ifShouldUpdateData(name, shouldUpdate => {
             if (!shouldUpdate) {
               rev()
               return
             }
             const f = (callback) => {
-              this.assignTaskByDiffPrefixOfName(k, callback)
+              this.assignTaskByDiffPrefixOfName(k, callback, () => {
+                util.updateDataDateInfo(name)
+              })
             }
             tasks.push(f)
             rev()

@@ -13,7 +13,7 @@ class AlbumList {
     autoBind(this)
   }
 
-  getAlbumListForArtist(artistId, index, total, outerCallback) {
+  getAlbumListForArtist(artistId, index, total, outerCallback, callbackForUpdate) {
     let url = util.getAlbumListUrl(artistId, 0)
     util.getHtmlSourceCodeWithGetMethod(url).then((response) => {
       let $ = cheerio.load(response, { decodeEntities: false })
@@ -54,10 +54,10 @@ class AlbumList {
       async.parallel(tasks, (err) => {
         if (err) {
           util.errMsg(err)
-          outerCallback(err)
           return
         }
         outerCallback()
+        callbackForUpdate()
       })
     }).catch((err) => {
       util.errMsg(err)
@@ -71,13 +71,16 @@ class AlbumList {
       _.forEach(allArtistRegistration, (artistInfo, index) => {
         bluebirdTasks.push(
           new bluebird.Promise((rev) => {
-            util.ifShouldUpdateData(`album-list-${artistInfo.id}`, shouldUpdate => {
-              if (!shouldUpdate) {
-                rev()
-                return
-              }
+            const name = `album-list-${artistInfo.id}`
+            util.ifShouldUpdateData(name, shouldUpdate => {
+              // if (!shouldUpdate) {
+              //   rev()
+                // return
+              // }
               const f = (callback) => {
-                this.getAlbumListForArtist(artistInfo.id, index, allArtistRegistration.length, callback)
+                this.getAlbumListForArtist(artistInfo.id, index, allArtistRegistration.length, callback, () => {
+                  util.updateDataDateInfo(name)
+                })
               }
               tasks.push(f)
               rev()
