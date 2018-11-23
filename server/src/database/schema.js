@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
-import { COLLECTIONS } from '../spider/constants'
+import serverConfig from '../config'
 
 const Schema = mongoose.Schema;
 
 // playlistInfo model
-const playlistInfo = mongoose.model(COLLECTIONS.COLLECTION_PLAY_LIST_INFO, new Schema({
+const playlistInfo = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_PLAY_LIST_INFO, new Schema({
   title: { type: 'String', required: true },             // 歌单标题
   playlist: { type: 'String', required: true },          // 歌单地址后缀
   metaInfo: { type: 'String', required: true },          // 歌单所属音乐风格分类
@@ -13,7 +13,7 @@ const playlistInfo = mongoose.model(COLLECTIONS.COLLECTION_PLAY_LIST_INFO, new S
 }));
 
 // playlistProperty model
-const playlistProperty = mongoose.model(COLLECTIONS.COLLECTION_PLAY_LIST_PROPERTY, new Schema({
+const playlistProperty = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_PLAY_LIST_PROPERTY, new Schema({
   title: { type: 'String', required: true },              // 歌单标题
   playlist: { type: 'String', required: true },           // 歌单地址后缀
   introduction: { type: 'String', required: true },       // 歌单介绍
@@ -25,19 +25,20 @@ const playlistProperty = mongoose.model(COLLECTIONS.COLLECTION_PLAY_LIST_PROPERT
 }));
 
 // musicRegistration model
-const musicRegistration = mongoose.model(COLLECTIONS.COLLECTION_MUSIC_REGISTRATION, new Schema({
+const musicRegistration = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_MUSIC_REGISTRATION, new Schema({
   id: { type: 'String', required: true },                 // 歌曲id
   name: { type: 'String', required: true },               // 歌曲名称
   playlist: { type: 'String', required: false },          // 所属歌单地址后缀
   artistName: { type: 'String', required: false },        // 所属音乐人的名字
-  duration: { type: 'String', required: false },         // 时长
+  duration: { type: 'String', required: false },          // 时长
   commentCount: { type: 'Number', required: false },      // 评论总数
+  hotComments: { type: 'Array', required: false },        // 热门评论
 }, {
   versionKey: false, // You should be aware of the outcome after set to false
 }));
 
 // artistRegistration model
-const artistRegistration = mongoose.model(COLLECTIONS.COLLECTION_ARTIST_REGISTRATION, new Schema({
+const artistRegistration = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_ARTIST_REGISTRATION, new Schema({
   id: { type: 'String', required: true },                 // 歌手id
   name: { type: 'String', required: true },               // 歌手名称
   artistClass: { type: 'String', required: true },        // 所属歌手类别分类，地址后缀形式表示
@@ -46,7 +47,7 @@ const artistRegistration = mongoose.model(COLLECTIONS.COLLECTION_ARTIST_REGISTRA
 }));
 
 // albumRegistration model
-const albumRegistration = mongoose.model(COLLECTIONS.COLLECTION_ALBUM_REGISTRATION, new Schema({
+const albumRegistration = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_ALBUM_REGISTRATION, new Schema({
   id: { type: 'String', required: true },                // 专辑id
   name: { type: 'String', required: true },              // 专辑名称
   artistId: { type: 'String', required: true },          // 所属歌手类别分类，地址后缀形式表示
@@ -55,7 +56,7 @@ const albumRegistration = mongoose.model(COLLECTIONS.COLLECTION_ALBUM_REGISTRATI
 }));
 
 // dataDateInfo model
-const dataDateInfo = mongoose.model(COLLECTIONS.COLLECTION_DATA_DATE_INFO, new Schema({
+const dataDateInfo = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_DATA_DATE_INFO, new Schema({
   name: { type: 'String', required: true },              // 名称，如果是歌手的专辑，则为 "歌手+专辑"
   date: { type: 'Number', required: true },              // 日期，用于在出现网络连接错误的情况下，再次获取数据不会重复之前成功的
 }, {

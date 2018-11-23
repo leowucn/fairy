@@ -1,17 +1,16 @@
 import cheerio from 'cheerio'
 import async from 'async'
-import _ from 'lodash'
 import autoBind from 'auto-bind'
-import bluebird from 'bluebird'
-import serverConfig from '../../config'
+import serverConfig from '../config'
 import database from '../database'
 import util from '../../util/util'
+import redisWrapper, { hgetAsync } from '../redis'
 
 class AlbumMusic {
   constructor() {
     autoBind(this)
   }
-  getMusicListOfAlbum(album, index, total, outerCallback, callbackForUpdate) {
+  getMusicListOfAlbum(album, index, total, outerCallback) {
     const albumUrl = util.getAlbumUrl(album.id)
     util.getHtmlSourceCodeWithGetMethod(albumUrl).then(async (response) => {
       const $ = cheerio.load(response, { decodeEntities: false })
@@ -23,52 +22,42 @@ class AlbumMusic {
           musicRegistration.name = $(this).html()
           musicRegistration.artistId = album.artistId
           musicRegistration.artistName = artistName
-          database.upsertMusicRegistration(musicRegistration)
+          redisWrapper.storeInRedis('music_registration_set', `mugis-${musicId}`, musicRegistration)
         })
       });
-      util.printMsgV2(`finish album ${album.name} which index = ${index}, total = ${total}`)
+      util.printMsgV2(`finish album ${album.name.padEnd(40)} which index = ${`${index}`.padEnd(12)}, total = ${`${total}`.padEnd(12)}`)
       outerCallback()
-      callbackForUpdate()
     })
   }
 
   callGetAllMusicRegistrationOfAlbums(outerCallback) {
     const currentThis = this
     const tasks = []
-    const bluebirdTasks = []
-    let index = 0
     database.getAllAlbumRegistration(async (allAlbumRegistration) => {
-      _.forEach(allAlbumRegistration, (album) => {
-        bluebirdTasks.push(
-          new bluebird.Promise((rev) => {
-            const name = `album-music-${album.id}`
-            util.ifShouldUpdateData(name, shouldUpdate => {
-              if (!shouldUpdate) {
-                rev()
-                return
-              }
-              const f = (callback) => {
-                currentThis.getMusicListOfAlbum(album, index, allAlbumRegistration.length, callback, () => {
-                  util.updateDataDateInfo(name)
-                })
-                index++
-              }
-              tasks.push(f)
-              rev()
-            })
+      for (let i = 0; i < allAlbumRegistration.length; i++) {
+        const album = allAlbumRegistration[i]
+        const dataDateItemName = `album-music-${album.id}`
+        const lastUpdateDate = await hgetAsync('data_date_info_hash', dataDateItemName)
+        const shouldUpdate = util.ifShouldUpdateData(lastUpdateDate)
+        if (!shouldUpdate) {
+          continue
+        }
+        const f = (callback) => {          // eslint-disable-line
+          currentThis.getMusicListOfAlbum(album, i, allAlbumRegistration.length, () => {
+            util.updateDataDateInfo(dataDateItemName)
+            callback()
           })
-        )
-      })
+        }
+        tasks.push(f)
+      }
       util.printMsgV1('Begin getting music information of all albums...')
-      await bluebird.Promise.all(bluebirdTasks).then(() => {
-        async.parallelLimit(tasks, serverConfig.maxConcurrentNumOfAlbumsForGetMusicInfo, (err) => {
-          if (err) {
-            util.errMsg(err)
-            return
-          }
-          util.printMsgV1('Finish getting music information of all albums!')
-          outerCallback()
-        })
+      async.parallelLimit(tasks, serverConfig.maxConcurrentNumOfAlbumsForGetMusicInfo, (err) => {
+        if (err) {
+          util.errMsg(err)
+          return
+        }
+        util.printMsgV1('Finish getting music information of all albums!')
+        outerCallback()
       })
     })
   }

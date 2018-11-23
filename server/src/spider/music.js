@@ -1,76 +1,80 @@
 import autoBind from 'auto-bind'
 import _ from 'lodash'
 import async from 'async'
-import bluebird from 'bluebird'
 import util from '../../util/util'
-import serverConfig from '../../config'
+import serverConfig from '../config'
 import database from '../database'
+import redisWrapper, { hgetAsync } from '../redis'
 
 class Music {
   constructor() {
     autoBind(this)
   }
-  updateMusicInfo(musicRegistration, index, total, outerCallback, callbackForUpdate) {
+  updateMusicInfo(musicRegistration, index, total, outerCallback) {
     const musicCommentUrl = util.getMusicCommentUrl(musicRegistration.id)
     util.getHtmlSourceCodeWithGetMethod(musicCommentUrl).then((response) => {
       const updatedMusicRegistration = musicRegistration
       updatedMusicRegistration.commentCount = response.total
-      database.upsertMusicRegistration(updatedMusicRegistration)
+      if (response.total > serverConfig.countOfHotCommentThreshold) {
+        this.callGetHotCommentsOfMusic(musicRegistration, outerCallback())
+      } else {
+        redisWrapper.storeInRedis('music_registration_set', `mugis-${musicRegistration.id}`, updatedMusicRegistration)
+        outerCallback()
+      }
       util.printMsgV2(`update music name = ${musicRegistration.name}, index = ${index}, total = ${total}`)
-      outerCallback()
-      callbackForUpdate()
     })
   }
   callUpdateAllMusicInfo(outerCallback) {
     const tasks = []
-    const bluebirdTasks = []
-    let index = 0
     database.getAllMusicRegistration(async (allMusicRegistration) => {
-      _.forEach(allMusicRegistration, (item) => {
-        bluebirdTasks.push(
-          new bluebird.Promise((rev) => {
-            const name = `music-${item.id}`
-            util.ifShouldUpdateData(name, shouldUpdate => {
-              if (!shouldUpdate) {
-                rev()
-                return
-              }
-              const f = (callback) => {
-                this.updateMusicInfo(item, index, allMusicRegistration.length, callback, () => {
-                  util.updateDataDateInfo(name)
-                })
-                index++
-              }
-              tasks.push(f)
-              rev()
-            })
+      for (let i = 0; i < allMusicRegistration.length; i++) {
+        const music = allMusicRegistration[i]
+
+        const dataDateItemName = `music-${music.id}`
+        const lastUpdateDate = await hgetAsync('data_date_info_hash', dataDateItemName)
+        const shouldUpdate = util.ifShouldUpdateData(lastUpdateDate)
+        if (music.commentCount && !shouldUpdate) {
+          continue
+        }
+        const f = (callback) => {                  // eslint-disable-line
+          this.updateMusicInfo(music, i, allMusicRegistration.length, () => {
+            util.updateDataDateInfo(dataDateItemName)
+            callback()
           })
-        )
-      })
+        }
+        tasks.push(f)
+      }
       util.printMsgV1('Begin update music comment information!')
-      await bluebird.Promise.all(bluebirdTasks).then(() => {
-        async.parallelLimit(tasks, serverConfig.maxConcurrentNumOfMusicForGetMusicInfo, (err) => {
-          if (err) {
-            util.errMsg(err)
-          }
-          util.printMsgV1('Finish updating music comment information!')
-          outerCallback()
-        })
+      async.parallelLimit(tasks, serverConfig.maxConcurrentNumOfMusicForGetMusicInfo, (err) => {
+        if (err) {
+          util.errMsg(err)
+        }
+        util.printMsgV1('Finish updating music comment information!')
+        outerCallback()
       })
     })
   }
 
-  callGetHotCommentsOfMusic(musicId, callback) {
-    const musicCommentUrl = util.getMusicCommentUrl(musicId)
+  callGetHotCommentsOfMusic(musicRegistration, callback) {
+    const musicCommentUrl = util.getMusicCommentUrl(musicRegistration.id)
     util.getHtmlSourceCodeWithGetMethod(musicCommentUrl).then((response) => {
       const res = []
       _.forEach(response.hotComments, (commentInfo) => {
-        const item = {}
-        item.likedCount = commentInfo.likedCount
-        item.content = commentInfo.content
-        res.push(item)
+        if (commentInfo.likedCount > serverConfig.countOfCommentFavorThreshold) {
+          const item = {}
+          item.likedCount = commentInfo.likedCount
+          item.content = commentInfo.content
+          res.push(item)
+        }
       })
-      callback(res.slice(0, 10))
+      musicRegistration.hotComments = res
+      redisWrapper.storeInRedis('music_registration_set', `mugis-${musicRegistration.id}`, musicRegistration)
+      if (callback) {
+        callback()
+      }
+    })
+    .catch(() => {
+      callback()
     })
   }
 }

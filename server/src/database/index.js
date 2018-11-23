@@ -10,6 +10,18 @@ class Database {
   constructor() {
     autoBind(this)
   }
+
+
+  // --------------------------------------------
+  bulkWrite(data) {
+    schemaDef.playlistInfo.bulkWrite(data, (err) => {
+      if (err) {
+        util.errMsg(err)
+      }
+    })
+  }
+
+
   // --------------------------------------------
   // playlistInfo
   upsertPlaylistInfo(data) {

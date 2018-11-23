@@ -3,10 +3,9 @@ import async from 'async'
 import _ from 'lodash'
 import autoBind from 'auto-bind'
 import bluebird from 'bluebird'
-import { MUSIC_STYLE } from './constants'
-import serverConfig from '../../config'
+import serverConfig from '../config'
 import util from '../../util/util'
-import database from '../database'
+import redisWrapper, { hgetAsync } from '../redis'
 
 
 class Playlist {
@@ -79,30 +78,6 @@ class Playlist {
   }
 
   /**
-   * getPlaylistsByMusicStyle的包装函数，方便调用
-   */
-  wrapperGetPlaylistsByMusicStyle(musicStyle, outerCallback, callbackForUpdateDateInfo) {
-    const tasks = []
-    const currentThis = this
-    const f = function (callback) {      // eslint-disable-line
-      currentThis.getPlaylistsByMusicStyle(musicStyle, callback)
-    }
-    tasks.push(f)
-    async.parallel(tasks, async (err, result) => {
-      if (err) {
-        util.errMsg(err)
-        return
-      }
-      util.printMsgV2(`musicStyle = ${result[0].musicStyle}, playlistInfo.length = ${result[0].playlistInfo.length}`)   // eslint-disable-line
-      _.forEach(result[0].playlistInfo, (item) => {
-        database.upsertPlaylistInfo(item)
-      })
-      outerCallback()
-      callbackForUpdateDateInfo()
-    })
-  }
-
-  /**
    * 提取歌单标题和对应的歌单地址
    * @param {*} htmlCode // 比如<a title="起床最强闹铃，就不信你不起" href="/playlist?id=922757186" class="tit f-thide s-fc0">起床最强闹铃，就不信你不起</a>
    * @param {*} metaInfo // 用于标识当前歌单属于哪个类别，比如华语，欧美等等。
@@ -123,44 +98,62 @@ class Playlist {
     return playlistInfo
   }
 
+
+  /**
+   * getPlaylistsByMusicStyle的包装函数，方便调用
+   */
+  wrapperGetPlaylistsByMusicStyle(musicStyle, outerCallback) {
+    const tasks = []
+    const currentThis = this
+    const f = function (callback) {      // eslint-disable-line
+      currentThis.getPlaylistsByMusicStyle(musicStyle, callback)
+    }
+    tasks.push(f)
+    async.parallel(tasks, async (err, result) => {
+      if (err) {
+        util.errMsg(err)
+        return
+      }
+      util.printMsgV2(`musicStyle = ${result[0].musicStyle}, playlistInfo.length = ${result[0].playlistInfo.length}`)   // eslint-disable-line
+      _.forEach(result[0].playlistInfo, (item) => {
+        redisWrapper.storeInRedis('playlist_info_set', `plist-${item.playlist}`, item)
+      })
+      outerCallback()
+    })
+  }
+
+
   /**
    * 获取所有音乐风格的歌单列表
    */
   async callGetPlaylistsForAllMusicStyle(outerCallback) {
     const tasks = []
     const currentThis = this
-    const bluebirdTasks = []
-    _.forEach(MUSIC_STYLE, (v) => {
-      bluebirdTasks.push(
-        new bluebird.Promise((rev) => {
-          const name = `playlist-${v}`
-          util.ifShouldUpdateData(name, shouldUpdate => {
-            if (!shouldUpdate) {
-              rev()
-              return
-            }
-            const f = (callback) => {
-              util.printMsgV1(`Prepare for the next data of music style ${v}...`)      // eslint-disable-line
-              currentThis.wrapperGetPlaylistsByMusicStyle(v, callback, () => {
-                util.updateDataDateInfo(name)
-              })
-            }
-            tasks.push(f)
-            rev()
-          })
+    for (let i = 0; i < serverConfig.MUSIC_STYLE.length; i++) {
+      const specificType = serverConfig.MUSIC_STYLE[i]
+      const dataDateItemName = `playlist-${specificType}`
+      const lastUpdateDate = await hgetAsync('data_date_info_hash', dataDateItemName)
+      const shouldUpdate = util.ifShouldUpdateData(lastUpdateDate)
+      if (!shouldUpdate) {
+        continue
+      }
+      const f = (callback) => {                                                  // eslint-disable-line
+        util.printMsgV1(`Prepare for the next data of music style ${specificType}...`)      // eslint-disable-line
+        currentThis.wrapperGetPlaylistsByMusicStyle(specificType, () => {
+          util.updateDataDateInfo(dataDateItemName)
+          callback()
         })
-      )
-    })
+      }
+      tasks.push(f)
+    }
 
-    await bluebird.Promise.all(bluebirdTasks).then(() => {
-      async.waterfall(tasks, (err) => {
-        if (err) {
-          util.errMsg(err)
-          return
-        }
-        util.printMsgV1('fetch play lists over!')      // eslint-disable-line
-        outerCallback()
-      })
+    async.waterfall(tasks, (err) => {
+      if (err) {
+        util.errMsg(err)
+        return
+      }
+      util.printMsgV1('fetch play lists over!')      // eslint-disable-line
+      outerCallback()
     })
   }
 

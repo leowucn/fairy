@@ -40,7 +40,7 @@ import Helmet from 'react-helmet';
 import routes from '../client/routes';
 import { fetchComponentData } from './util/fetchData';
 import serverRoutes from './routes/routes';
-import serverConfig from './config';
+import serverConfig from './src/config';      // eslint-disable-line
 
 // Set native promises as mongoose promise
 mongoose.Promise = global.Promise;

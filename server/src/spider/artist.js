@@ -2,11 +2,9 @@ import autoBind from 'auto-bind'
 import _ from 'lodash'
 import cheerio from 'cheerio'
 import async from 'async'
-import bluebird from 'bluebird'
 import util from '../../util/util'
-import serverConfig from '../../config'
-import { ARTIST_CLASS } from './constants'
-import database from '../database'
+import serverConfig from '../config'
+import redisWrapper, { hgetAsync } from '../redis'
 
 class Artist {
   constructor() {
@@ -23,7 +21,7 @@ class Artist {
         artistRegistration.id = id
         artistRegistration.name = $('.nm').html()
         artistRegistration.artistClass = artistClass
-        database.upsertArtistRegistration(artistRegistration)
+        redisWrapper.storeInRedis('artist_registration_set', `artist-${id}`, artistRegistration)
       });
       outerCallback()
     }).catch((err) => {
@@ -31,7 +29,7 @@ class Artist {
     })
   }
 
-  assignTaskByDiffPrefixOfName(artistClass, outerCallback, callbackForUpdate) {
+  assignTaskByDiffPrefixOfName(artistClass, outerCallback) {
     const tasks = []
     _.forEach(serverConfig.artistPrefixOfName, (item) => {
       let n = '0'
@@ -44,49 +42,40 @@ class Artist {
       }
       tasks.push(f)
     })
-    util.printMsgV2(`begin getting registration of artist class: ${ARTIST_CLASS[artistClass]}...`)
+    util.printMsgV2(`begin getting registration of artist class: ${serverConfig.ARTIST_CLASS[artistClass]}...`)
     async.parallelLimit(tasks, serverConfig.maxConcurrentNumGetArtistInfo, (err) => {
       if (err) {
         util.errMsg(err)
       }
-      util.printMsgV2(`finish getting registration of artist class: ${ARTIST_CLASS[artistClass]}`)
+      util.printMsgV2(`finish getting registration of artist class: ${serverConfig.ARTIST_CLASS[artistClass]}`)
       outerCallback()
-      callbackForUpdate()
     })
   }
 
   async callGetAllArtistInfo(outerCallback) {
     const tasks = []
-    const bluebirdTasks = []
-    _.forEach(ARTIST_CLASS, (v, k) => {
-      bluebirdTasks.push(
-        new bluebird.Promise((rev) => {
-          const name = `artist-${v}`
-          util.ifShouldUpdateData(name, shouldUpdate => {
-            if (!shouldUpdate) {
-              rev()
-              return
-            }
-            const f = (callback) => {
-              this.assignTaskByDiffPrefixOfName(k, callback, () => {
-                util.updateDataDateInfo(name)
-              })
-            }
-            tasks.push(f)
-            rev()
-          })
+    for (const [desc, shortLink] of Object.entries(serverConfig.ARTIST_CLASS)) {
+      const dataDateItemName = `artist-${desc}`
+      const lastUpdateDate = await hgetAsync('data_date_info_hash', dataDateItemName)
+      const shouldUpdate = util.ifShouldUpdateData(lastUpdateDate)
+      if (!shouldUpdate) {
+        continue
+      }
+      const f = (callback) => {                             // eslint-disable-line
+        this.assignTaskByDiffPrefixOfName(desc, () => {    // eslint-disable-line
+          util.updateDataDateInfo(dataDateItemName)
+          callback()
         })
-      )
-    })
+      }
+      tasks.push(f)
+    }
     util.printMsgV1('Begin getting all of the artists information!')
-    await bluebird.Promise.all(bluebirdTasks).then(() => {
-      async.series(tasks, (err) => {
-        if (err) {
-          util.errMsg(err)
-        }
-        util.printMsgV1('Finish getting all of the artists information!')
-        outerCallback()
-      })
+    async.series(tasks, (err) => {
+      if (err) {
+        util.errMsg(err)
+      }
+      util.printMsgV1('Finish getting all of the artists information!')
+      outerCallback()
     })
   }
 }

@@ -1,9 +1,8 @@
 import axios from 'axios'
 import dateFormat from 'dateformat'
 import autoBind from 'auto-bind'
-import { URL } from '../src/spider/constants'
-import serverConfig from '../config'
-import database from '../src/database'
+import serverConfig from '../src/config'
+import { hsetAsync } from '../src/redis'
 
 
 class Util {
@@ -25,20 +24,20 @@ class Util {
     if (pageIndex > 1) {
       offset = (pageIndex - 1) * 35   // 每一页35条数据
     }
-    const url = URL.URL_MUSIC_STYLE.concat(musicStyle).concat(`&limit=35&offset=${offset}`)
+    const url = serverConfig.URL.URL_MUSIC_STYLE.concat(musicStyle).concat(`&limit=35&offset=${offset}`)
     return encodeURI(url)
   }
 
   getPlaylistUrl(playlistPostfix) {
-    return encodeURI(URL.URL_ROOT_LIST.concat(playlistPostfix.trim()))
+    return encodeURI(serverConfig.URL.URL_ROOT_LIST.concat(playlistPostfix.trim()))
   }
 
   getMusicCommentUrl(id) {
-    return URL.URL_COMMENT_V2.concat(id)
+    return serverConfig.URL.URL_COMMENT_V2.concat(id)
   }
 
   getArtistTypeUrl(artistTypePostfixUrl) {
-    return URL.URL_ARTIST.concat(artistTypePostfixUrl)
+    return serverConfig.URL.URL_ARTIST.concat(artistTypePostfixUrl)
   }
 
   getAlbumListUrl(artistId, pageIndex) {
@@ -46,11 +45,11 @@ class Util {
     if (pageIndex > 1) {
       offset = (pageIndex - 1) * 12   // 每一页12条数据
     }
-    return URL.URL_ALBUM_LIST.concat(`?id=${artistId}&limit=12&offset=${offset}`)
+    return serverConfig.URL.URL_ALBUM_LIST.concat(`?id=${artistId}&limit=12&offset=${offset}`)
   }
 
   getAlbumUrl(albumId) {
-    return URL.URL_ALBUM.concat(albumId)
+    return serverConfig.URL.URL_ALBUM.concat(albumId)
   }
 
   getHtmlSourceCodeWithGetMethod(url) {
@@ -71,14 +70,8 @@ class Util {
   }
 
   printMsgV1(msg) {
-    let m = ''
-    if (msg.length > serverConfig.maxMsgLength) {      // 如果日志长度过大就干脆直接返回
-      m = msg
-    } else {
-      const count = (serverConfig.maxMsgLength - msg.length) / 2
-      m = '-'.repeat(count).concat(msg).concat('-'.repeat(count))
-    }
-    console.log(this.getNowTimeForDisplay().concat(m))           // eslint-disable-line
+    const m = '------------------------'
+    console.log(this.getNowTimeForDisplay().concat(`${m}${msg.padEnd(65)}${m}`))           // eslint-disable-line
   }
   printMsgV2(msg) {
     console.log(this.getNowTimeForDisplay().concat('   '.concat(msg)))           // eslint-disable-line
@@ -90,26 +83,15 @@ class Util {
     return time.slice(0, 19)
   }
 
-  ifShouldUpdateData(name, callback) {
-    database.getDataDateInfoByName(name, (dataDateInfo) => {
-      const nowMillseconds = (new Date()).getTime()
-      if (!dataDateInfo) {
-        callback(true)
-        return
-      }
-      if (nowMillseconds - dataDateInfo.date > serverConfig.updateIntervalDays) {
-        callback(true)
-        return
-      }
-      callback(false)
-    })
+  ifShouldUpdateData(date) {
+    if (new Date().getTime() - date < serverConfig.updateDbInterval) {
+      return false
+    }
+    return true
   }
 
   updateDataDateInfo(name) {
-    const newDataDateInfo = {}
-    newDataDateInfo.name = name
-    newDataDateInfo.date = (new Date()).getTime()
-    database.upsertDataDateInfo(newDataDateInfo)
+    hsetAsync('data_date_info_hash', name, new Date().getTime())
   }
 
   millisToMinutesAndSeconds(millis) {

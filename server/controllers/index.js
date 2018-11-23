@@ -1,16 +1,16 @@
 import schema from '../src/database/schema'
 import database from '../src/database'
-import config from '../config'
+import serverConfig from '../src/config'
 export function getRanks(req, res) {
   const result = {}
   const ranks = []
-  getCommentCountForMusicRank(config.musicCountPerPage, musicCommentRank => {
+  getCommentCountForMusicRank(serverConfig.musicCountPerPage, musicCommentRank => {
     ranks.push({ title: '音乐评论数排行榜', data: musicCommentRank })
-    getCollectCountForPlaylistRank(config.musicCountPerPage, playlistCollectRank => {
+    getCollectCountForPlaylistRank(serverConfig.musicCountPerPage, playlistCollectRank => {
       ranks.push({ title: '歌单收藏数排行榜', data: playlistCollectRank })
-      getCommentCountForPlaylistRank(config.musicCountPerPage, playlistCommentRank => {
+      getCommentCountForPlaylistRank(serverConfig.musicCountPerPage, playlistCommentRank => {
         ranks.push({ title: '歌单评论数排行榜', data: playlistCommentRank })
-        getPlayTimesCountForPlaylistRank(config.musicCountPerPage, playlistPlayTimesRank => {
+        getPlayTimesCountForPlaylistRank(serverConfig.musicCountPerPage, playlistPlayTimesRank => {
           ranks.push({ title: '歌单播放数排行榜', data: playlistPlayTimesRank })
           database.getAllDataDateInfo(allDataDateInfo => {
             result.ranks = ranks
@@ -29,7 +29,7 @@ export function getRanks(req, res) {
 /**
  * 根据音乐评论数生成的排行榜
  */
-function getCommentCountForMusicRank(count = config.musicCountPerPage, callback) {
+function getCommentCountForMusicRank(count = serverConfig.musicCountPerPage, callback) {
   const q = schema.musicRegistration.find({}).sort({ commentCount: -1 }).limit(count)
   q.exec((err, docs) => {
     callback(docs)
@@ -39,7 +39,7 @@ function getCommentCountForMusicRank(count = config.musicCountPerPage, callback)
 /**
  * 根据歌单收藏数生成的排行榜
  */
-function getCollectCountForPlaylistRank(count = config.musicCountPerPage, callback) {
+function getCollectCountForPlaylistRank(count = serverConfig.musicCountPerPage, callback) {
   const q = schema.playlistProperty.find({}).sort({ collectCount: -1 }).limit(count)
   q.exec((err, docs) => {
     callback(docs)
@@ -49,7 +49,7 @@ function getCollectCountForPlaylistRank(count = config.musicCountPerPage, callba
 /**
  * 根据歌单评论数生成的排行榜
  */
-function getCommentCountForPlaylistRank(count = config.musicCountPerPage, callback) {
+function getCommentCountForPlaylistRank(count = serverConfig.musicCountPerPage, callback) {
   const q = schema.playlistProperty.find({}).sort({ commentCount: -1 }).limit(count)
   q.exec((err, docs) => {
     callback(docs)
@@ -59,7 +59,7 @@ function getCommentCountForPlaylistRank(count = config.musicCountPerPage, callba
 /**
  * 根据歌单播放次数生成的排行榜
  */
-function getPlayTimesCountForPlaylistRank(count = config.musicCountPerPage, callback) {
+function getPlayTimesCountForPlaylistRank(count = serverConfig.musicCountPerPage, callback) {
   const q = schema.playlistProperty.find({}).sort({ playCount: -1 }).limit(count)
   q.exec((err, docs) => {
     callback(docs)

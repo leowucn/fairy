@@ -3,9 +3,9 @@ import async from 'async'
 import _ from 'lodash'
 import bluebird from 'bluebird'
 import util from '../../util/util'
-import serverConfig from '../../config'
-import { URL } from './constants'
+import serverConfig from '../config'
 import database from '../database'
+import redisWrapper, { hgetAsync } from '../redis'
 
 
 class PlaylistProperty {
@@ -18,16 +18,15 @@ class PlaylistProperty {
    * @param {*} index           当前歌单再批量任务中的索引，用于日志显示使用
    * @param {*} outerCallback   外部传进来的用于异步库async进行流程控制的回调函数
    */
-  getPlaylistProperty(playlistInfo, index, total, outerCallback, callbackForUpdate) {
+  getPlaylistProperty(playlistInfo, index, total, outerCallback) {
     const currentThis = this
-    const playlistUrl = URL.URL_MUSIC.concat(util.getNumberStringFromString(playlistInfo.playlist))
+    const playlistUrl = serverConfig.URL.URL_MUSIC.concat(util.getNumberStringFromString(playlistInfo.playlist))
     util.getHtmlSourceCodeWithGetMethod(playlistUrl).then((htmlSourceCode) => {
       const resObj = htmlSourceCode.result
       currentThis.parsePlaylistPropertyInfo(resObj, playlistInfo)
       currentThis.parseMusicList(resObj, playlistInfo.playlist)
       util.printMsgV1(`update playlist property index = ${index}, total = ${total}`)
       outerCallback()
-      callbackForUpdate()
       return ''
     }).catch((err) => {
       util.errMsg(err)
@@ -51,7 +50,7 @@ class PlaylistProperty {
       playlistProperty.playCount = Number(resObj.playCount)
       playlistProperty.commentCount = Number(resObj.commentCount)
       playlistProperty.collectCount = resObj.shareCount
-      database.upsertPlaylistProperty(playlistProperty)
+      redisWrapper.storeInRedis('playlist_property_set', `prepty-${playlistInfo.playlist}`, playlistProperty)
     })
   }
 
@@ -68,7 +67,7 @@ class PlaylistProperty {
       musicRegistration.playlist = playlist
       musicRegistration.artistName = _.map(item.artists, 'name').join('/')
       musicRegistration.duration = util.millisToMinutesAndSeconds(item.duration)
-      database.upsertMusicRegistration(musicRegistration)
+      redisWrapper.storeInRedis('music_registration_set', `mugis-${item.id}`, musicRegistration)
     })
   }
 
@@ -78,39 +77,32 @@ class PlaylistProperty {
   callUpdateAllPlaylistProperty(outerCallback) {
     const currentThis = this
     const tasks = []
-    const bluebirdTasks = []
     let index = 0
     database.getAllPlaylistInfos(async (allPlaylistInfos) => {
-      _.forEach(allPlaylistInfos, (item) => {
-        bluebirdTasks.push(
-          new bluebird.Promise((rev) => {
-            const name = `playlist-property-${item.playlist}`
-            util.ifShouldUpdateData(name, shouldUpdate => {
-              if (!shouldUpdate) {
-                rev()
-                return
-              }
-              const f = (cb) => {
-                currentThis.getPlaylistProperty(item, index, allPlaylistInfos.length, cb, () => {
-                  util.updateDataDateInfo(name)
-                })
-                index++
-              }
-              tasks.push(f)
-              rev()
-            })
+      for (let i = 0; i < allPlaylistInfos.length; i++) {
+        const item = allPlaylistInfos[i]
+        const dataDateItemName = `playlist-property-${item.playlist}`
+        const lastUpdateDate = await hgetAsync('data_date_info_hash', dataDateItemName)
+        const shouldUpdate = util.ifShouldUpdateData(lastUpdateDate)
+        if (!shouldUpdate) {
+          continue
+        }
+        const f = (callback) => {                                                      // eslint-disable-line
+          currentThis.getPlaylistProperty(item, index, allPlaylistInfos.length, () => {
+            util.updateDataDateInfo(dataDateItemName)
+            callback()
           })
-        )
-      })
+          index++
+        }
+        tasks.push(f)
+      }
       util.printMsgV1('Begin upsert play list property finish!')
-      await bluebird.Promise.all(bluebirdTasks).then(() => {
-        async.parallelLimit(tasks, serverConfig.maxConcurrentNumGetPlaylistProperty, (err) => {
-          if (err) {
-            util.errMsg(err)
-          }
-          util.printMsgV1('Finish upsert play list property finish!')
-          outerCallback()
-        })
+      async.parallelLimit(tasks, serverConfig.maxConcurrentNumGetPlaylistProperty, (err) => {
+        if (err) {
+          util.errMsg(err)
+        }
+        util.printMsgV1('Finish upsert play list property finish!')
+        outerCallback()
       })
     })
   }
