@@ -1,6 +1,5 @@
-import schema from '../src/database/schema'
-import database from '../src/database'
 import serverConfig from '../src/config'
+import schema from '../src/config/schema'
 export function getRanks(req, res) {
   const result = {}
   const ranks = []
@@ -10,16 +9,15 @@ export function getRanks(req, res) {
       ranks.push({ title: '歌单收藏数排行榜', data: playlistCollectRank })
       getCommentCountForPlaylistRank(serverConfig.musicCountPerPage, playlistCommentRank => {
         ranks.push({ title: '歌单评论数排行榜', data: playlistCommentRank })
-        getPlayTimesCountForPlaylistRank(serverConfig.musicCountPerPage, playlistPlayTimesRank => {
+        getPlayTimesCountForPlaylistRank(serverConfig.musicCountPerPage, async playlistPlayTimesRank => {
           ranks.push({ title: '歌单播放数排行榜', data: playlistPlayTimesRank })
-          database.getAllDataDateInfo(allDataDateInfo => {
-            result.ranks = ranks
-            result.date = new Date().getTime()
-            if (allDataDateInfo.length > 0) {
-              result.date = allDataDateInfo[0].date
-            }
-            res.json(result)
-          })
+          const allDataDateInfo = await schema.playlistProperty.find({})
+          result.ranks = ranks
+          result.date = new Date().getTime()
+          if (allDataDateInfo.length > 0) {
+            result.date = allDataDateInfo[0].date
+          }
+          res.json(result)
         })
       })
     })

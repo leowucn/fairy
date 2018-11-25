@@ -1,22 +1,31 @@
 const config = {
+  fariyAsciiBanner: `
+                                                                        '########::::'###::::'####:'########::'##:::'##:
+                                                                         ##.....::::'## ##:::. ##:: ##.... ##:. ##:'##::
+                                                                         ##::::::::'##:. ##::: ##:: ##:::: ##::. ####:::
+                                                                         ######:::'##:::. ##:: ##:: ########::::. ##::::
+                                                                         ##...:::: #########:: ##:: ##.. ##:::::: ##::::
+                                                                         ##::::::: ##.... ##:: ##:: ##::. ##::::: ##::::
+                                                                         ##::::::: ##:::: ##:'####: ##:::. ##:::: ##::::
+                                                                        ..::::::::..:::::..::....::..:::::..:::::..:::::
+  `,
   mongoURL: process.env.MONGO_URL || 'mongodb://localhost:27017/fairy',
   redisURL: process.env.REDIS_URL || 'redis://localhost:6379',
   port: process.env.PORT || 9528,
 
-  bulkOperationInterval: 20,      // 每隔指定秒数扫描redis，把数据存放到mongodb，间隔太短，容易导致mongodb占用cpu使用率高过
-  bulkOperationNum: 10000,         // 批量处理的数目
+  bulkOperationInterval: 1000 * 15,               // 每隔指定秒数扫描redis，把数据存放到mongodb，间隔太短，容易导致mongodb占用cpu使用率高过
+  bulkOperationNum: 2000,                         // 批量处理的数目
 
-  // 设置评论抓取条件，抓取太多会过于占用磁盘空间
-  countOfHotCommentThreshold: 10000,              // 对于热评数大于这个值的音乐才抓取评论
+  countOfHotCommentThreshold: 10000,              // 设置评论抓取条件，对于热评数大于这个值的音乐才抓取评论，否则抓取太多会过于占用磁盘空间
   countOfCommentFavorThreshold: 10000,            // 抓取评论时，之抓取点赞数大于这个值得评论
   // 对于页数类型的参数配置，-1表示没有限制
-  maxPageIndexForPlaylist: 1,                     // 要抓取的歌单最大页数
+  maxPageIndexForPlaylist: 1,                    // 要抓取的歌单最大页数
   maxPageIndexForAlbum: -1,                       // 要抓取歌手的专辑的最大页数
-  maxConcurrentNumGetPlaylistProperty: 30,        // 并发获取音乐歌单属性信息的歌单数目
-  maxConcurrentNumOfMusicForGetMusicInfo: 30,     // 并发更新音乐评论数的歌曲数目
-  maxConcurrentNumGetArtistInfo: 30,              // 并发获取歌手信息的数目
-  maxConcurrentNumOfSingerForGetAlbum: 30,        // 要并发抓取专辑的歌手的数目
-  maxConcurrentNumOfAlbumsForGetMusicInfo: 30,    // 要并发从专辑抓取歌曲信息的最大专辑数目
+  maxConcurrentNumGetPlaylistProperty: 60,        // 并发获取音乐歌单属性信息的歌单数目
+  maxConcurrentNumOfMusicForGetMusicInfo: 60,     // 并发更新音乐评论数的歌曲数目
+  maxConcurrentNumGetArtistInfo: 60,              // 并发获取歌手信息的数目
+  maxConcurrentNumOfSingerForGetAlbum: 60,        // 要并发抓取专辑的歌手的数目
+  maxConcurrentNumOfAlbumsForGetMusicInfo: 60,    // 要并发从专辑抓取歌曲信息的最大专辑数目
   updateDbInterval: 1000 * 3600 * 24 * 5,         // 隔多少毫秒后更新本地数据库
   musicCountPerPage: 100,                         // 给客户端每次请求排行榜显示多少数据
 
@@ -32,10 +41,6 @@ const config = {
     // proxy: {
     //   host: '61.135.217.7',
     //   port: 80,
-    // },
-    // proxy: {
-    //   host: '101.81.141.175',
-    //   port: 9999,
     // },
   },
   artistPrefixOfName: ['0', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
@@ -63,6 +68,8 @@ const config = {
     URL_COMMENT_V2: 'http://music.163.com/api/v1/resource/comments/R_SO_4_',                      // get方法，最后需要拼一个歌曲id
     URL_ALBUM_LIST: 'http://music.163.com/artist/album',                                          // 专辑列表地址前缀
     URL_ALBUM: 'http://music.163.com/album?id=',                                                  // 专辑地址前缀
+    URL_PLAYLIST: 'https://music.163.com/playlist?id=',                                         // 歌单主页
+    URL_USER_HOME: 'https://music.163.com/user/home?id=',                                         // 歌手主页
   },
 
 
@@ -147,7 +154,7 @@ const config = {
    * 网易云音乐歌手部分, 可以作为指定音乐榜单的url后缀，需要做url编码转换
    */
   ARTIST_CLASS: {
-    'cat?id=1001': '华语男歌手',
+    // 'cat?id=1001': '华语男歌手',
     // 'cat?id=1002': '华语女歌手',
     // 'cat?id=1003': '华语组合/乐队',
     // 'cat?id=2001': '欧美男歌手',
@@ -160,17 +167,10 @@ const config = {
     // 'cat?id=7002': '韩国女歌手',
     // 'cat?id=7003': '韩国组合/乐队',
     // 'cat?id=4001': '其他男歌手',
-    // 'cat?id=4002': '其他女歌手',
+    'cat?id=4002': '其他女歌手',
     // 'cat?id=4003': '其他组合/乐队',
   },
 
-  /**
-   * 事件
-   */
-  EVENTS_DEF: {
-    EVENT_NEW_PLAY_LIST: 'newPlaylist',    // 新的歌单列表
-    EVENT_NEW_MUSIC: 'newMusic',           // 新的歌曲
-  },
 
   /**
    * mongodb数据库collection名字

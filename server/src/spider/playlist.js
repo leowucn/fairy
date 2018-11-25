@@ -1,8 +1,8 @@
 import cheerio from 'cheerio'
 import async from 'async'
 import _ from 'lodash'
-import autoBind from 'auto-bind'
 import bluebird from 'bluebird'
+import autoBind from 'auto-bind'
 import serverConfig from '../config'
 import util from '../../util/util'
 import redisWrapper, { hgetAsync } from '../redis'
@@ -15,65 +15,61 @@ class Playlist {
   /**
    * 获取指定音乐风格的歌单列表
    * @param {string} musicStyle  定义在constants.js中，表示音乐风格，如'华语'
-   * @param {function} outerCallback  用于把抓取下来的数据传送出去;w
+   * @param {function} outerCallback  用于把抓取下来的数据传送出去;
    */
-  getPlaylistsByMusicStyle(musicStyle, outerCallback) {
+  async getPlaylistsByMusicStyle(musicStyle, outerCallback) {
     const currentThis = this
     let url = util.getMusicStyleUrl(musicStyle)
-    util.getHtmlSourceCodeWithGetMethod(url).then(async function(body) {             // eslint-disable-line
-      let $ = cheerio.load(body, { decodeEntities: false })
-      const aSize = $('#m-pl-pager').find('a').length
-      let maxPageIndex = 0
-      $('#m-pl-pager').find('a').each(function (i, elem) {                            // eslint-disable-line
-        if (i === aSize - 2) {
-          maxPageIndex = Number($(this).html())
-        }
-      });
-      maxPageIndex = serverConfig.maxPageIndexForPlaylist <= 0 ? maxPageIndex : serverConfig.maxPageIndexForPlaylist
-      const tasks = []
-      for (let pageIndex = 1; pageIndex <= maxPageIndex; pageIndex++) {
-        const f = function (callback) {                                              // eslint-disable-line
-          url = util.getMusicStyleUrl(musicStyle, pageIndex)
-          util.getHtmlSourceCodeWithGetMethod(url).then((b) => {
-            const result = []
-            $ = cheerio.load(b, { decodeEntities: false })
-            $('#m-pl-container').find('li').each(function (i, elem) {                 // eslint-disable-line
-              $ = cheerio.load(this, { decodeEntities: false })
-              const playlistInfo = currentThis.extractTitleAndPlayerList($('p[class=dec]').html(), musicStyle)
-              if (playlistInfo) {
-                result.push(playlistInfo)
-              }
-            });
-            callback(null, result)
-            return null
-          }).catch((err) => {
-            util.errMsg(err)
-          })
-        }
-        tasks.push(f)
+    const body = await util.getHtmlSourceCodeWithGetMethod(url)
+    let $ = cheerio.load(body, { decodeEntities: false })
+    const aSize = $('#m-pl-pager').find('a').length
+    let maxPageIndex = 0
+    $('#m-pl-pager').find('a').each(function (i, elem) {
+      if (i === aSize - 2) {
+        maxPageIndex = Number($(this).html())
       }
-      await async.parallel(tasks, (err, results) => {
-        if (err) {
-          outerCallback(err)
-          return util.errMsg(err)
-        }
-        const playlistInfo = []
-        _.forEach(results, (playlistArr) => {
-          _.forEach(playlistArr, (playlist) => {
-            try {
-              if (playlist) {
-                playlistInfo.push(playlist)
-              }
-            } catch (e) {
-              util.errMsg(e)
+    });
+    maxPageIndex = serverConfig.maxPageIndexForPlaylist <= 0 ? maxPageIndex : serverConfig.maxPageIndexForPlaylist
+    const tasks = []
+    for (let pageIndex = 1; pageIndex <= maxPageIndex; pageIndex++) {
+      const f = (callback) => {                                         // eslint-disable-line
+        url = util.getMusicStyleUrl(musicStyle, pageIndex)
+        util.getHtmlSourceCodeWithGetMethod(url).then((b) => {
+          const result = []
+          $ = cheerio.load(b, { decodeEntities: false })
+          $('#m-pl-container').find('li').each(function (i, elem) {
+            $ = cheerio.load(this, { decodeEntities: false })
+            const playlistInfo = currentThis.extractTitleAndPlayerList($('p[class=dec]').html(), musicStyle)
+            if (playlistInfo) {
+              result.push(playlistInfo)
             }
-          })
+          });
+          callback(null, result)
+          return null
+        }).catch((err) => {
+          util.errMsg(err)
         })
-        return outerCallback(null, { musicStyle, playlistInfo })
+      }
+      tasks.push(f)
+    }
+    await async.parallel(tasks, (err, results) => {
+      if (err) {
+        outerCallback(err)
+        return util.errMsg(err)
+      }
+      const playlistInfo = []
+      _.forEach(results, (playlistArr) => {
+        _.forEach(playlistArr, (playlist) => {
+          try {
+            if (playlist) {
+              playlistInfo.push(playlist)
+            }
+          } catch (e) {
+            util.errMsg(e)
+          }
+        })
       })
-      return null
-    }).catch((err) => {
-      util.errMsg(err)
+      return outerCallback(null, { musicStyle, playlistInfo })
     })
   }
 
@@ -87,8 +83,9 @@ class Playlist {
     let current;
     const playlistInfo = {}
     const container = []
-    while (current = pattern.exec(htmlCode)) // eslint-disable-line
+    while (current = pattern.exec(htmlCode)) {   // eslint-disable-line
       container.push(current[0]);
+    }
     playlistInfo.title = container[0].replace(/['"]+/g, '')
     playlistInfo.playlist = container[1].replace(/['"]+/g, '')
     playlistInfo.metaInfo = metaInfo
@@ -102,10 +99,10 @@ class Playlist {
   /**
    * getPlaylistsByMusicStyle的包装函数，方便调用
    */
-  wrapperGetPlaylistsByMusicStyle(musicStyle, outerCallback) {
-    const tasks = []
+  wrapperGetPlaylistsByMusicStyle(musicStyle, index, total, outerCallback) {
     const currentThis = this
-    const f = function (callback) {      // eslint-disable-line
+    const tasks = []
+    const f = (callback) => {
       currentThis.getPlaylistsByMusicStyle(musicStyle, callback)
     }
     tasks.push(f)
@@ -114,10 +111,19 @@ class Playlist {
         util.errMsg(err)
         return
       }
-      util.printMsgV2(`musicStyle = ${result[0].musicStyle}, playlistInfo.length = ${result[0].playlistInfo.length}`)   // eslint-disable-line
+      util.beautifulPrintMsgV2(
+        '获取音乐风格歌单',
+        `外部遍历序号: ${index}`,
+        `总数: ${total}`,
+        `${musicStyle}，歌单总数：${result[0].playlistInfo.length}`
+      )
+      const promiseTasks = []
       _.forEach(result[0].playlistInfo, (item) => {
-        redisWrapper.storeInRedis('playlist_info_set', `plist-${item.playlist}`, item)
+        promiseTasks.push(
+          redisWrapper.storeInRedis('playlist_info_set', `plist-${item.playlist}`, item)
+        )
       })
+      await bluebird.Promise.all(promiseTasks)
       outerCallback()
     })
   }
@@ -128,7 +134,6 @@ class Playlist {
    */
   async callGetPlaylistsForAllMusicStyle(outerCallback) {
     const tasks = []
-    const currentThis = this
     for (let i = 0; i < serverConfig.MUSIC_STYLE.length; i++) {
       const specificType = serverConfig.MUSIC_STYLE[i]
       const dataDateItemName = `playlist-${specificType}`
@@ -137,9 +142,8 @@ class Playlist {
       if (!shouldUpdate) {
         continue
       }
-      const f = (callback) => {                                                  // eslint-disable-line
-        util.printMsgV1(`Prepare for the next data of music style ${specificType}...`)      // eslint-disable-line
-        currentThis.wrapperGetPlaylistsByMusicStyle(specificType, () => {
+      const f = (callback) => {
+        this.wrapperGetPlaylistsByMusicStyle(specificType, i + 1, serverConfig.MUSIC_STYLE.length, () => {
           util.updateDataDateInfo(dataDateItemName)
           callback()
         })
@@ -147,12 +151,13 @@ class Playlist {
       tasks.push(f)
     }
 
+    util.beautifulPrintMsgV1('..........开始 针对每一种音乐风格获取歌单!..........')
     async.waterfall(tasks, (err) => {
       if (err) {
         util.errMsg(err)
         return
       }
-      util.printMsgV1('fetch play lists over!')      // eslint-disable-line
+      util.beautifulPrintMsgV1('..........结束 针对每一种音乐风格获取歌单!..........\n')
       outerCallback()
     })
   }

@@ -2,6 +2,7 @@ import autoBind from 'auto-bind'
 import _ from 'lodash'
 import cheerio from 'cheerio'
 import async from 'async'
+import bluebird from 'bluebird'
 import util from '../../util/util'
 import serverConfig from '../config'
 import redisWrapper, { hgetAsync } from '../redis'
@@ -10,24 +11,37 @@ class Artist {
   constructor() {
     autoBind(this)
   }
-  getArtists(artistClass, url, outerCallback) {
-    util.getHtmlSourceCodeWithGetMethod(url).then((body) => {
-      let $ = cheerio.load(body, { decodeEntities: false })
-      $('#m-artist-box').find('li').each(function (i, elem) {      // eslint-disable-line
-        $ = cheerio.load(this, { decodeEntities: false })
-        const id = util.getNumberStringFromString($('.nm').attr('href'))
+  async getArtists(artistClass, url, outerCallback) {
+    const currentThis = this
+    const body = await util.getHtmlSourceCodeWithGetMethod(url)
+    const promiseTasks = []
+    let $ = cheerio.load(body, { decodeEntities: false })
+    $('#m-artist-box').find('li').each(async function (i, elem) {
+      $ = cheerio.load(this, { decodeEntities: false })
+      const id = util.getNumberStringFromString($('.nm').attr('href'))
 
-        const artistRegistration = {}
-        artistRegistration.id = id
-        artistRegistration.name = $('.nm').html()
-        artistRegistration.artistClass = artistClass
+      const artistRegistration = {}
+      artistRegistration.id = id
+      artistRegistration.name = $('.nm').html()
+      artistRegistration.artistClass = artistClass
+      artistRegistration.fanCount = await currentThis.getFanCountOfArtist()
+      promiseTasks.push(
         redisWrapper.storeInRedis('artist_registration_set', `artist-${id}`, artistRegistration)
-      });
-      outerCallback()
-    }).catch((err) => {
-      util.errMsg(err)
+      )
+    });
+    await bluebird.Promise.all(promiseTasks)
+    outerCallback()
+  }
+
+  async getFanCountOfArtist(artistId) {
+    return new Promise(async (resolve) => {
+      const artistHomeUrl = serverConfig.URL.URL_USER_HOME + artistId
+      const htmlSourceCode = await util.getHtmlSourceCodeWithGetMethod(artistHomeUrl)
+      const $ = cheerio.load(htmlSourceCode, { decodeEntities: false })
+      resolve(Number($('#fan_count').text()))
     })
   }
+
 
   assignTaskByDiffPrefixOfName(artistClass, outerCallback) {
     const tasks = []
@@ -42,12 +56,11 @@ class Artist {
       }
       tasks.push(f)
     })
-    util.printMsgV2(`begin getting registration of artist class: ${serverConfig.ARTIST_CLASS[artistClass]}...`)
     async.parallelLimit(tasks, serverConfig.maxConcurrentNumGetArtistInfo, (err) => {
       if (err) {
         util.errMsg(err)
       }
-      util.printMsgV2(`finish getting registration of artist class: ${serverConfig.ARTIST_CLASS[artistClass]}`)
+      util.beautifulPrintMsgV1(`完成该歌手类别歌手清单的获取： ${serverConfig.ARTIST_CLASS[artistClass]}`)
       outerCallback()
     })
   }
@@ -62,19 +75,19 @@ class Artist {
         continue
       }
       const f = (callback) => {                             // eslint-disable-line
-        this.assignTaskByDiffPrefixOfName(desc, () => {    // eslint-disable-line
+        this.assignTaskByDiffPrefixOfName(desc, () => {
           util.updateDataDateInfo(dataDateItemName)
           callback()
         })
       }
       tasks.push(f)
     }
-    util.printMsgV1('Begin getting all of the artists information!')
+    util.beautifulPrintMsgV1('..........开始获取歌手清单！..........')
     async.series(tasks, (err) => {
       if (err) {
         util.errMsg(err)
       }
-      util.printMsgV1('Finish getting all of the artists information!')
+      util.beautifulPrintMsgV1('..........结束获取歌手清单！..........\n')
       outerCallback()
     })
   }

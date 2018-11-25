@@ -1,22 +1,49 @@
 import axios from 'axios'
 import dateFormat from 'dateformat'
 import autoBind from 'auto-bind'
+import { createStream } from 'table';
+import _ from 'lodash';
+
 import serverConfig from '../src/config'
 import { hsetAsync } from '../src/redis'
 
+const streamConfig = {
+  columnDefault: {
+    width: 50,
+  },
+  columnCount: 5,
+  columns: {
+    0: {
+      width: 30,
+      alignment: 'center'
+    },
+    1: {
+      width: 20,
+      alignment: 'center',
+    },
+    2: {
+      width: 32,
+      alignment: 'center',
+    },
+    3: {
+      alignment: 'center',
+      width: 20,
+    },
+    4: {
+      alignment: 'center',
+      width: 70,
+    },
+  },
+};
+const stream = createStream(streamConfig);
 
 class Util {
   constructor() {
     autoBind(this)
   }
-  errMsg(err, msg) {
-    if (err) {
-      this.printMsgV1('error happened!')
-      this.printMsgV1(`error msg = ${msg}`)
-      this.printMsgV1('---------------')
-      console.log(err)                          // eslint-disable-line
-      this.printMsgV1('error over!')
-    }
+  errMsg(err) {
+    this.beautifulPrintMsgV1('发生了错误！')
+    this.beautifulPrintMsgV1(err)
   }
 
   getMusicStyleUrl(musicStyle, pageIndex) {
@@ -69,12 +96,28 @@ class Util {
     return rawStr.replace(/[^0-9]/g, '')
   }
 
-  printMsgV1(msg) {
-    const m = '------------------------'
-    console.log(this.getNowTimeForDisplay().concat(`${m}${msg.padEnd(65)}${m}`))           // eslint-disable-line
+  beautifulPrintMsgV1(...args) {
+    let resMsg = `\n${this.getNowTimeForDisplay()}     `
+    let fixedWidth = 80
+    for (let i = 0; i < args.length; i++) {
+      if (i > 0) {
+        fixedWidth = 30
+      }
+      const argument = args[i]
+      if (argument.length < fixedWidth) {
+        resMsg += argument.concat(' '.repeat(fixedWidth - argument.length))
+      } else {
+        resMsg += argument + ' '.repeat(5)
+      }
+    }
+    console.log(resMsg)
   }
-  printMsgV2(msg) {
-    console.log(this.getNowTimeForDisplay().concat('   '.concat(msg)))           // eslint-disable-line
+
+  /**
+   * 以整齐的表格形式打印日志，暂时只支持4个参数的情况
+   */
+  beautifulPrintMsgV2(...args) {
+    stream.write([this.getNowTimeForDisplay(), args[0], args[1], args[2], args[3]]);
   }
 
   getNowTimeForDisplay() {

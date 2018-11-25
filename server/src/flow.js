@@ -1,99 +1,48 @@
-import _ from 'lodash'
 import async from 'async'
 
 import util from '../util/util'
 import serverConfig from './config'
-import playlist from './spider/playlist'  // 测试使用
-import playlistProperty from './spider/playlist-property'  // 测试使用
-import music from './spider/music'  // 测试使用
+import playlist from './spider/playlist'
+import playlistProperty from './spider/playlist-property'
+import music from './spider/music'
 import artist from './spider/artist'
 import albumList from './spider/album-list'
 import albumMusic from './spider/album-music'
-import redisWrapper, { flushallAsync } from './redis'
+import redisWrapper from './redis'
 
 
-export async function run() {
-  //----------------------------------------
-  // await flushallAsync()
-  setInterval(
-    () => {
-      redisWrapper.redisToMongodb()
-    },
-    serverConfig.bulkOperationInterval * 1000              // 每隔一段时间调用一次mongodb数据库写入函数
-  )
-  // --------------- 并发第1阶段---------------
-  const firstStageFuncs = [
-    redisWrapper.loadToRedis,
-  ]
-  // --------------- 并发第2阶段---------------
-  const secondStageFuncs = [
-    playlist.callGetPlaylistsForAllMusicStyle,
-    artist.callGetAllArtistInfo,
+export function runSpider() {
+  const processStags = [
+    redisWrapper.loadToRedis,                             // 加载时间信息到redis
+
+    playlist.callGetPlaylistsForAllMusicStyle,            // 针对每一种音乐风格获取音乐歌单
+    playlistProperty.callUpdateAllPlaylistProperty,       // 针对每一个歌单，获取它的介绍信息和音乐清单
+
+    // artist.callGetAllArtistInfo,                          // 获取歌手列表
+    // albumList.callGetAlbumListForAllArtist,               // 针对每一个歌手获取他/她的专辑列表
+    // albumMusic.callGetAllMusicRegistrationOfAlbums,       // 针对每一个专辑，获取它的音乐清单
+
+    // music.callUpdateAllMusicInfo,                         // 针对每一首歌曲，获取它的评论数和热门评论
+
+    redisWrapper.storeDataDateInfoToMongodb,                       // 把redis中的数据，存储到mongodb
   ]
 
-  // --------------- 并发第3阶段---------------
-  const thirdStageFuncs = [
-    playlistProperty.callUpdateAllPlaylistProperty,
-    albumList.callGetAlbumListForAllArtist,
-  ]
-
-  // --------------- 并发第4阶段---------------
-  const fourthStageFuncs = [
-    albumMusic.callGetAllMusicRegistrationOfAlbums,
-  ]
-
-  // --------------- 并发第5阶段---------------
-  const fifthStageFuncs = [
-    music.callUpdateAllMusicInfo,
-  ]
-  // --------------- 并发第6阶段---------------
-  const sixthStageFuncs = [
-    redisWrapper.storeDataDateInfo,
-  ]
-
-  const firstStageTask = createTaskForAsync(firstStageFuncs, 1)
-  const secondStageTask = createTaskForAsync(secondStageFuncs, 2)
-  const thirdStageTask = createTaskForAsync(thirdStageFuncs, 3)
-  const fourthStageTask = createTaskForAsync(fourthStageFuncs, 4)
-  const fifthStageTask = createTaskForAsync(fifthStageFuncs, 5)
-  const sixthStageTask = createTaskForAsync(sixthStageFuncs, 6)
-
-  const tasks = [
-    firstStageTask,
-    secondStageTask,
-    thirdStageTask,
-    // fourthStageTask,
-    fifthStageTask,
-    sixthStageTask,
-  ]
-  async.series(tasks, (err) => {
+  const stagesTasks = []
+  for (let i = 0; i < processStags.length; i++) {
+    const f = (callback) => {
+      const dummyString = '.....................................'
+      util.beautifulPrintMsgV1(dummyString.concat(`开始第 ${i + 1} 阶段的方法调用, 总共 ${processStags.length} 阶段！`).concat(dummyString))
+      processStags[i](callback)
+    }
+    stagesTasks.push(f)
+  }
+  const dummyString = '...............................................................'
+  util.beautifulPrintMsgV1(serverConfig.fariyAsciiBanner)
+  util.beautifulPrintMsgV1(dummyString.concat('网易云音乐数据抓取 开始！').concat(dummyString))
+  async.series(stagesTasks, (err) => {
     if (err) {
       util.errMsg(err)
     }
-    util.printMsgV1('Game over!')
+    util.beautifulPrintMsgV1(dummyString.concat('网易云音乐数据抓取 结束！').concat(dummyString))
   })
-}
-
-/**
- * 创建可以同时并发或者顺序运行的task，供async使用
- */
-function createTaskForAsync(funcs, numberFlag) {
-  const tasks = []
-  return (outerCallback) => {
-    _.forEach(funcs, (func) => {
-      const f = (callback) => {
-        func(callback)
-      }
-      tasks.push(f)
-    })
-    async.parallel(tasks, (err) => {
-      if (err) {
-        util.errMsg(err)
-        outerCallback()
-        return
-      }
-      util.printMsgV1(`Functions which should run at ${numberFlag} step have finished!`)
-      outerCallback()
-    })
-  }
 }

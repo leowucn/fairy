@@ -5,59 +5,60 @@ import { promisify } from 'util'
 
 import serverConfig from '../config';
 import util from '../../util/util'
-import schemaDef from '../database/schema'
+import schema from '../config/schema'
 
 
-const client = redis.createClient(serverConfig.redisURL);
-client.on('error', (err) => {
+export const redisClient = redis.createClient(serverConfig.redisURL);
+redisClient.on('error', (err) => {
   util.errMsg(`redis error: ${err}`)
 });
-export const smembersAsync = promisify(client.smembers).bind(client);
-export const hgetallAsync = promisify(client.hgetall).bind(client);
-export const hgetAsync = promisify(client.hget).bind(client)
-export const flushallAsync = promisify(client.flushall).bind(client)
-export const hsetAsync = promisify(client.hset).bind(client)
+export const smembersAsync = promisify(redisClient.smembers).bind(redisClient);
+export const hgetallAsync = promisify(redisClient.hgetall).bind(redisClient);
+export const hgetAsync = promisify(redisClient.hget).bind(redisClient)
+export const flushallAsync = promisify(redisClient.flushall).bind(redisClient)
+export const hsetAsync = promisify(redisClient.hset).bind(redisClient)
+export const saddAsync = promisify(redisClient.sadd).bind(redisClient)
 
 class RedisWrapper {
   constructor() {
     autoBind(this)
   }
 
-  loadToRedis(outerCallback) {
-    schemaDef.dataDateInfo.find({}, async (err, res) => {
-      for (let i = 0; i < res.length; i++) {
-        await hsetAsync('data_date_info_hash', res[i].name, res[i].date)
-      }
-      outerCallback()
-    })
-  }
+  async loadToRedis(outerCallback) {
+    const allDataDateInfo = await schema.playlistProperty.find({})
+    for (let i = 0; i < allDataDateInfo.length; i++) {
+      await hsetAsync('data_date_info_hash', allDataDateInfo[i].name, allDataDateInfo[i].date)
+    }
 
-  storeDataDateInfo(outerCallback) {
-    client.hgetall('data_date_info_hash', (err, info) => {
-      // console.log('-----info = ', info)
-      if (!info) {
-        return
-      }
-      const bulkOperations = []
-      for (const [name, date] of Object.entries(info)) {
-        if ((new Date().getTime() - date) < serverConfig.updateDbInterval) {
-          bulkOperations.push({
-            updateOne: {
-              filter: { name },
-              update: { date, name },
-              upsert: true,
-            },
-          })
-        }
-      }
-      // console.log('-----bulkOperations.length = ', bulkOperations.length)
-      if (bulkOperations.length) {
-        schemaDef.dataDateInfo.bulkWrite(bulkOperations)
-        .then(() => {
-          outerCallback()
-        })
-      }
-    })
+    const allPlaylistInfos = await schema.playlistInfo.find({})
+    for (let i = 0; i < allPlaylistInfos.length; i++) {
+      const playlistInfo = allPlaylistInfos[i]._doc
+      await this.storeInRedis('playlist_info_set', `plist-${playlistInfo.playlist}`, playlistInfo)
+    }
+
+    const allArtistRegistration = await schema.artistRegistration.find({})
+    for (let i = 0; i < allArtistRegistration.length; i++) {
+      const artistRegistration = allArtistRegistration[i]._doc
+      await this.storeInRedis('artist_registration_set', `artist-${artistRegistration.id}`, artistRegistration)
+    }
+
+    const allPlaylistPropertys = await schema.playlistProperty.find({})
+    for (let i = 0; i < allPlaylistPropertys.length; i++) {
+      const playlistProperty = allPlaylistPropertys[i]._doc
+      await this.storeInRedis('playlist_property_set', `prepty-${playlistProperty.playlist}`, playlistProperty)
+    }
+    const allMusicRegistration = await schema.musicRegistration.find({})
+    for (let i = 0; i < allMusicRegistration.length; i++) {
+      const musicRegistration = allMusicRegistration[i]._doc
+      await this.storeInRedis('music_registration_set', `mugis-${musicRegistration.id}`, musicRegistration)
+    }
+
+    const allAlbumRegistration = await schema.albumRegistration.find({})
+    for (let i = 0; i < allAlbumRegistration.length; i++) {
+      const albumRegistration = allAlbumRegistration[i]._doc
+      await this.storeInRedis('album_registration_set', `alist-${albumRegistration.id}`, albumRegistration)
+    }
+    outerCallback()
   }
 
 
@@ -68,10 +69,13 @@ class RedisWrapper {
    * @param {Object} itemInfo  值，保存抓取下来的数据，后续将被插入mongodb
    */
   storeInRedis(setName, setItem, itemInfo) {
-    client.sadd(setName, setItem)
-    _.forEach(itemInfo, (value, field) => {     // eslint-disable-line
-      value = value || ''
-      client.hset(setItem, field, value.toString())
+    return new Promise(async (resolve) => {
+      await saddAsync(setName, setItem)
+      for (let [key, value] of Object.entries(itemInfo)) {   // eslint-disable-line
+        value = value || ''
+        await hsetAsync(setItem, key, value.toString())
+      }
+      resolve()
     })
   }
 
@@ -79,24 +83,24 @@ class RedisWrapper {
   /**
    * 用来把redis中缓存的数据，保存到mongodb
    */
-  redisToMongodb() {
+  redisDataToMongodb() {
     _.forEach(serverConfig.REDIS_SET, async (queryName, setName) => {
       let collection
       switch (setName) {
         case 'playlist_info_set':
-          collection = schemaDef.playlistInfo
+          collection = schema.playlistInfo
           break;
         case 'artist_registration_set':
-          collection = schemaDef.artistRegistration
+          collection = schema.artistRegistration
           break;
         case 'playlist_property_set':
-          collection = schemaDef.playlistProperty
+          collection = schema.playlistProperty
           break;
         case 'music_registration_set':
-          collection = schemaDef.musicRegistration
+          collection = schema.musicRegistration
           break;
         case 'album_registration_set':
-          collection = schemaDef.albumRegistration
+          collection = schema.albumRegistration
           break;
         default:
           break;
@@ -123,8 +127,43 @@ class RedisWrapper {
       }
       if (hasWorkedItems.length) {
         collection.bulkWrite(bulkOperations)
-        client.srem(setName, hasWorkedItems)
-        client.del(hasWorkedItems)
+        redisClient.srem(setName, hasWorkedItems)
+        redisClient.del(hasWorkedItems)
+      }
+    })
+  }
+
+  storeDataDateInfoToMongodb(outerCallback) {
+    setInterval(
+      () => {
+        this.redisDataToMongodb()
+      },
+      serverConfig.bulkOperationInterval                     // 每隔一段时间调用一次mongodb数据库写入函数
+    )
+
+    redisClient.hgetall('data_date_info_hash', (err, info) => {
+      // console.log('-----info = ', info)
+      if (!info) {
+        return
+      }
+      const bulkOperations = []
+      for (const [name, date] of Object.entries(info)) {
+        if ((new Date().getTime() - date) < serverConfig.updateDbInterval) {
+          bulkOperations.push({
+            updateOne: {
+              filter: { name },
+              update: { date, name },
+              upsert: true,
+            },
+          })
+        }
+      }
+      // console.log('-----bulkOperations.length = ', bulkOperations.length)
+      if (bulkOperations.length) {
+        schema.dataDateInfo.bulkWrite(bulkOperations)
+        .then(() => {
+          outerCallback()
+        })
       }
     })
   }

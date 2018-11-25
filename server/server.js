@@ -10,9 +10,10 @@ import webpack from 'webpack';
 import config from '../webpack.config.dev';
 import webpackDevMiddleware from 'webpack-dev-middleware';
 import webpackHotMiddleware from 'webpack-hot-middleware';
-import { run } from './src/flow'
+import { runSpider } from './src/flow'
+import util from './util/util'
 
-run()
+runSpider()
 
 // Initialize the Express App
 const app = new Express()
@@ -40,13 +41,13 @@ import Helmet from 'react-helmet';
 import routes from '../client/routes';
 import { fetchComponentData } from './util/fetchData';
 import serverRoutes from './routes/routes';
-import serverConfig from './src/config';      // eslint-disable-line
+import serverConfig from './src/config'
 
 // Set native promises as mongoose promise
 mongoose.Promise = global.Promise;
 
 // MongoDB Connection
-mongoose.connect(serverConfig.mongoURL, (error) => {
+mongoose.connect(serverConfig.mongoURL, { useNewUrlParser: true }, (error) => {
   if (error) {
     console.error('Please make sure Mongodb is installed and running!'); // eslint-disable-line no-console
     throw error;
@@ -143,10 +144,6 @@ app.use((req, res, next) => {
 });
 
 // start app
-app.listen(serverConfig.port, (error) => {
-  if (!error) {
-    console.log(`MERN is running on port: ${serverConfig.port}! Build something amazing!`); // eslint-disable-line
-  }
-});
+app.listen(serverConfig.port)
 
 export default app;

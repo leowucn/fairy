@@ -1,10 +1,10 @@
 import cheerio from 'cheerio'
 import async from 'async'
 import autoBind from 'auto-bind'
+import bluebird from 'bluebird'
 import serverConfig from '../config'
-import database from '../database'
 import util from '../../util/util'
-import redisWrapper, { hgetAsync } from '../redis'
+import redisWrapper, { hgetAsync, smembersAsync, hgetallAsync } from '../redis'
 
 class AlbumMusic {
   constructor() {
@@ -13,52 +13,58 @@ class AlbumMusic {
   getMusicListOfAlbum(album, index, total, outerCallback) {
     const albumUrl = util.getAlbumUrl(album.id)
     util.getHtmlSourceCodeWithGetMethod(albumUrl).then(async (response) => {
+      const promiseTasks = []
       const $ = cheerio.load(response, { decodeEntities: false })
-      $('#song-list-pre-cache').find('a').each(function (i, elem) {          // eslint-disable-line
-        database.getArtistNameByArtistId(album.artistId, artistName => {
+      $('#song-list-pre-cache').find('a').each(async function (i, elem) {
+        const allArtistRegistrationKeys = await smembersAsync('artist_registration_set')
+        for (let j = 0; j < allArtistRegistrationKeys.length; j++) {
+          const artistInfo = await hgetallAsync(allArtistRegistrationKeys[j])
           const musicId = util.getNumberStringFromString($(this).attr('href'))
           const musicRegistration = {}
           musicRegistration.id = musicId
           musicRegistration.name = $(this).html()
           musicRegistration.artistId = album.artistId
-          musicRegistration.artistName = artistName
-          redisWrapper.storeInRedis('music_registration_set', `mugis-${musicId}`, musicRegistration)
-        })
+          musicRegistration.artistName = artistInfo.name
+          promiseTasks.push(
+            redisWrapper.storeInRedis('music_registration_set', `mugis-${musicId}`, musicRegistration)
+          )
+        }
       });
-      util.printMsgV2(`finish album ${album.name.padEnd(40)} which index = ${`${index}`.padEnd(12)}, total = ${`${total}`.padEnd(12)}`)
+      util.beautifulPrintMsgV2('获取专辑音乐清单', `外部遍历序号: ${index}`, `总数: ${total}`, `${album.name}`)
+      await bluebird.Promise.all(promiseTasks)
       outerCallback()
     })
   }
 
-  callGetAllMusicRegistrationOfAlbums(outerCallback) {
+  async callGetAllMusicRegistrationOfAlbums(outerCallback) {
     const currentThis = this
     const tasks = []
-    database.getAllAlbumRegistration(async (allAlbumRegistration) => {
-      for (let i = 0; i < allAlbumRegistration.length; i++) {
-        const album = allAlbumRegistration[i]
-        const dataDateItemName = `album-music-${album.id}`
-        const lastUpdateDate = await hgetAsync('data_date_info_hash', dataDateItemName)
-        const shouldUpdate = util.ifShouldUpdateData(lastUpdateDate)
-        if (!shouldUpdate) {
-          continue
-        }
-        const f = (callback) => {          // eslint-disable-line
-          currentThis.getMusicListOfAlbum(album, i, allAlbumRegistration.length, () => {
-            util.updateDataDateInfo(dataDateItemName)
-            callback()
-          })
-        }
-        tasks.push(f)
+
+    const allAlbumRegistrationKeys = await smembersAsync('album_registration_set')
+    for (let i = 0; i < allAlbumRegistrationKeys.length; i++) {
+      const album = await hgetallAsync(allAlbumRegistrationKeys[i])
+      const dataDateItemName = `album-music-${album.id}`
+      const lastUpdateDate = await hgetAsync('data_date_info_hash', dataDateItemName)
+      const shouldUpdate = util.ifShouldUpdateData(lastUpdateDate)
+      if (!shouldUpdate) {
+        continue
       }
-      util.printMsgV1('Begin getting music information of all albums...')
-      async.parallelLimit(tasks, serverConfig.maxConcurrentNumOfAlbumsForGetMusicInfo, (err) => {
-        if (err) {
-          util.errMsg(err)
-          return
-        }
-        util.printMsgV1('Finish getting music information of all albums!')
-        outerCallback()
-      })
+      const f = (callback) => {          // eslint-disable-line
+        currentThis.getMusicListOfAlbum(album, i + 1, allAlbumRegistrationKeys.length, () => {
+          util.updateDataDateInfo(dataDateItemName)
+          callback()
+        })
+      }
+      tasks.push(f)
+    }
+    util.beautifulPrintMsgV1('..........开始 针对每一个音乐专辑，获取它的音乐清单!..........')
+    async.parallelLimit(tasks, serverConfig.maxConcurrentNumOfAlbumsForGetMusicInfo, (err) => {
+      if (err) {
+        util.errMsg(err)
+        return
+      }
+      util.beautifulPrintMsgV1('..........结束 针对每一个音乐专辑，获取它的音乐清单!..........\n')
+      outerCallback()
     })
   }
 }

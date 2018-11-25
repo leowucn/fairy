@@ -1,6 +1,5 @@
-import mongoose from 'mongoose';
 import serverConfig from '../config'
-
+import mongoose from 'mongoose';
 const Schema = mongoose.Schema;
 
 // playlistInfo model
@@ -12,17 +11,22 @@ const playlistInfo = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_PLAY_LIS
   versionKey: false, // You should be aware of the outcome after set to false
 }));
 
-// playlistProperty model
-const playlistProperty = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_PLAY_LIST_PROPERTY, new Schema({
+
+const playlistPropertySchema = new Schema({
   title: { type: 'String', required: true },              // 歌单标题
   playlist: { type: 'String', required: true },           // 歌单地址后缀
   introduction: { type: 'String', required: true },       // 歌单介绍
+  playlistMusicCount: { type: 'Number', required: true }, // 歌单包含音乐的数目
   playCount: { type: 'Number', required: true },          // 歌单播放次数
   commentCount: { type: 'Number', required: true },       // 歌单评论次数
   collectCount: { type: 'Number', required: true },       // 歌单收藏次数
+  createTime: { type: 'Number', required: true },
 }, {
   versionKey: false, // You should be aware of the outcome after set to false
-}));
+});
+// playlistPropertySchema.index({ playlist: 1 }); // schema level
+// playlistProperty model
+const playlistProperty = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_PLAY_LIST_PROPERTY, playlistPropertySchema);
 
 // musicRegistration model
 const musicRegistration = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_MUSIC_REGISTRATION, new Schema({
@@ -30,7 +34,6 @@ const musicRegistration = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_MUS
   name: { type: 'String', required: true },               // 歌曲名称
   playlist: { type: 'String', required: false },          // 所属歌单地址后缀
   artistName: { type: 'String', required: false },        // 所属音乐人的名字
-  duration: { type: 'String', required: false },          // 时长
   commentCount: { type: 'Number', required: false },      // 评论总数
   hotComments: { type: 'Array', required: false },        // 热门评论
 }, {
@@ -41,6 +44,7 @@ const musicRegistration = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_MUS
 const artistRegistration = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_ARTIST_REGISTRATION, new Schema({
   id: { type: 'String', required: true },                 // 歌手id
   name: { type: 'String', required: true },               // 歌手名称
+  fanCount: { type: 'Number', required: false },         // 歌手粉丝数
   artistClass: { type: 'String', required: true },        // 所属歌手类别分类，地址后缀形式表示
 }, {
   versionKey: false, // You should be aware of the outcome after set to false
@@ -64,7 +68,7 @@ const dataDateInfo = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_DATA_DAT
 }));
 
 
-const schemaDef = {
+const schema = {
   playlistInfo,
   playlistProperty,
   musicRegistration,
@@ -73,4 +77,4 @@ const schemaDef = {
   dataDateInfo,
 }
 
-export default schemaDef;
+export default schema;
