@@ -6,7 +6,7 @@
 
 ![mindfulness (1)](./resource/mindfulness.png)
 
-​														Icon made by [Freepik]([http://www.freepik.com](http://www.freepik.com/))
+Icon made by [Freepik](http://www.freepik.com/)
 
 #Fairy
 
