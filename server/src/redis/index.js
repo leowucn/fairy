@@ -15,9 +15,11 @@ redisClient.on('error', (err) => {
 export const smembersAsync = promisify(redisClient.smembers).bind(redisClient);
 export const hgetallAsync = promisify(redisClient.hgetall).bind(redisClient);
 export const hgetAsync = promisify(redisClient.hget).bind(redisClient)
+export const hdelAsync = promisify(redisClient.hdel).bind(redisClient)
 export const flushallAsync = promisify(redisClient.flushall).bind(redisClient)
 export const hsetAsync = promisify(redisClient.hset).bind(redisClient)
 export const saddAsync = promisify(redisClient.sadd).bind(redisClient)
+export const sismemberAsync = promisify(redisClient.sismember).bind(redisClient)
 
 class RedisWrapper {
   constructor() {
@@ -25,7 +27,7 @@ class RedisWrapper {
   }
 
   async loadToRedis(outerCallback) {
-    const allDataDateInfo = await schema.playlistProperty.find({})
+    const allDataDateInfo = await schema.dataDateInfo.find({})
     for (let i = 0; i < allDataDateInfo.length; i++) {
       await hsetAsync('data_date_info_hash', allDataDateInfo[i].name, allDataDateInfo[i].date)
     }
@@ -76,6 +78,24 @@ class RedisWrapper {
         await hsetAsync(setItem, key, value.toString())
       }
       resolve()
+    })
+  }
+
+  deleteHashMembersWithStartsString(key, startWithString) {
+    return new Promise(async resolve => {
+      try {
+        const hashObj = await hgetallAsync(key)
+        for (let [k, v] of Object.entries(hashObj)) {   // eslint-disable-line
+          if (k.startsWith(startWithString)) {
+            await hdelAsync(key, k)
+          }
+        }
+        console.log('delete ok!')
+        resolve()
+      } catch (err) {
+        console.log('delete ok!')
+        resolve()
+      }
     })
   }
 
@@ -133,7 +153,7 @@ class RedisWrapper {
     })
   }
 
-  storeDataDateInfoToMongodb(outerCallback) {
+  async storeDataDateInfoToMongodb(outerCallback) {
     setInterval(
       () => {
         this.redisDataToMongodb()
@@ -141,31 +161,28 @@ class RedisWrapper {
       serverConfig.bulkOperationInterval                     // 每隔一段时间调用一次mongodb数据库写入函数
     )
 
-    redisClient.hgetall('data_date_info_hash', (err, info) => {
-      // console.log('-----info = ', info)
-      if (!info) {
-        return
-      }
-      const bulkOperations = []
-      for (const [name, date] of Object.entries(info)) {
-        if ((new Date().getTime() - date) < serverConfig.updateDbInterval) {
-          bulkOperations.push({
-            updateOne: {
-              filter: { name },
-              update: { date, name },
-              upsert: true,
-            },
-          })
-        }
-      }
-      // console.log('-----bulkOperations.length = ', bulkOperations.length)
-      if (bulkOperations.length) {
-        schema.dataDateInfo.bulkWrite(bulkOperations)
-        .then(() => {
-          outerCallback()
+    const dataDateHash = await hgetallAsync('data_date_info_hash')
+    if (!dataDateHash) {
+      return
+    }
+    const bulkOperations = []
+    for (const [name, date] of Object.entries(dataDateHash)) {
+      if ((new Date().getTime() - date) < serverConfig.updateDbInterval) {
+        bulkOperations.push({
+          updateOne: {
+            filter: { name },
+            update: { date, name },
+            upsert: true,
+          },
         })
       }
-    })
+    }
+    if (bulkOperations.length) {
+      schema.dataDateInfo.bulkWrite(bulkOperations)
+      .then(() => {
+        outerCallback()
+      })
+    }
   }
 }
 

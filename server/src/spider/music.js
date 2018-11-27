@@ -10,18 +10,18 @@ class Music {
     autoBind(this)
   }
   updateMusicInfo(musicRegistration, index, total, outerCallback) {
-    const currentThis = this
-    const musicCommentUrl = util.getMusicCommentUrl(musicRegistration.id)
-    util.getHtmlSourceCodeWithGetMethod(musicCommentUrl).then(async (response) => {
-      const updatedMusicRegistration = musicRegistration
-      updatedMusicRegistration.commentCount = response.total
+    return new Promise(async resolve => {
+      const currentThis = this
+      const musicCommentUrl = util.getMusicCommentUrl(musicRegistration.id)
+      const response = await util.getHtmlSourceCodeWithGetMethod(musicCommentUrl)
+      musicRegistration.commentCount = response.total
       if (response.total > serverConfig.countOfHotCommentThreshold) {
-        await currentThis.callGetHotCommentsOfMusic(musicRegistration)
-      } else {
-        await redisWrapper.storeInRedis('music_registration_set', `mugis-${musicRegistration.id}`, updatedMusicRegistration)
+        musicRegistration = await currentThis.callGetHotCommentsOfMusic(musicRegistration)
       }
-      outerCallback()
+      await redisWrapper.storeInRedis('music_registration_set', `mugis-${musicRegistration.id}`, musicRegistration)
       util.beautifulPrintMsgV2('获取音乐评论数和热门评论', `外部遍历序号: ${index}`, `总数: ${total}`, `${musicRegistration.name}`)
+      outerCallback()
+      resolve()
     })
   }
 
@@ -39,8 +39,7 @@ class Music {
         }
       })
       musicRegistration.hotComments = hotComments
-      await redisWrapper.storeInRedis('music_registration_set', `mugis-${musicRegistration.id}`, musicRegistration)
-      resolve()
+      resolve(musicRegistration)
     })
   }
 
@@ -53,13 +52,16 @@ class Music {
       const musicRegistration = await hgetallAsync(allMusicRegistrationKeys[i])
       const dataDateItemName = `music-${musicRegistration.id}`
       const lastUpdateDate = await hgetAsync('data_date_info_hash', dataDateItemName)
-      const shouldUpdate = util.ifShouldUpdateData(lastUpdateDate)
+      const shouldUpdate = util.ifShouldUpdateData(lastUpdateDate, true)
       if (musicRegistration.commentCount && !shouldUpdate) {
         continue
       }
-      const f = (callback) => {                  // eslint-disable-line
+      const f = async (callback) => {                  // eslint-disable-line
         this.updateMusicInfo(musicRegistration, i + 1, allMusicRegistrationKeys.length, () => {
           util.updateDataDateInfo(dataDateItemName)
+          callback()
+        })
+        .catch(err => {
           callback()
         })
       }

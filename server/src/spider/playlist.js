@@ -32,23 +32,19 @@ class Playlist {
     maxPageIndex = serverConfig.maxPageIndexForPlaylist <= 0 ? maxPageIndex : serverConfig.maxPageIndexForPlaylist
     const tasks = []
     for (let pageIndex = 1; pageIndex <= maxPageIndex; pageIndex++) {
-      const f = (callback) => {                                         // eslint-disable-line
+      const f = async (callback) => {                                         // eslint-disable-line
         url = util.getMusicStyleUrl(musicStyle, pageIndex)
-        util.getHtmlSourceCodeWithGetMethod(url).then((b) => {
-          const result = []
-          $ = cheerio.load(b, { decodeEntities: false })
-          $('#m-pl-container').find('li').each(function (i, elem) {
-            $ = cheerio.load(this, { decodeEntities: false })
-            const playlistInfo = currentThis.extractTitleAndPlayerList($('p[class=dec]').html(), musicStyle)
-            if (playlistInfo) {
-              result.push(playlistInfo)
-            }
-          });
-          callback(null, result)
-          return null
-        }).catch((err) => {
-          util.errMsg(err)
-        })
+        const b = await util.getHtmlSourceCodeWithGetMethod(url)
+        const result = []
+        $ = cheerio.load(b, { decodeEntities: false })
+        $('#m-pl-container').find('li').each(function (i, elem) {
+          $ = cheerio.load(this, { decodeEntities: false })
+          const playlistInfo = currentThis.extractTitleAndPlayerList($('p[class=dec]').html(), musicStyle)
+          if (playlistInfo) {
+            result.push(playlistInfo)
+          }
+        });
+        callback(null, result)
       }
       tasks.push(f)
     }

@@ -12,8 +12,8 @@ class AlbumList {
     autoBind(this)
   }
 
-  getAlbumListForArtist(artistId, index, total, outerCallback) {
-    let url = util.getAlbumListUrl(artistId, 0)
+  getAlbumListForArtist(artist, index, total, outerCallback) {
+    let url = util.getAlbumListUrl(artist.id, 0)
     util.getHtmlSourceCodeWithGetMethod(url).then((response) => {
       let $ = cheerio.load(response, { decodeEntities: false })
       const aSize = $('div[class=u-page]').find('a').length
@@ -27,7 +27,7 @@ class AlbumList {
       const tasks = []
       for (let pageIndex = 1; pageIndex <= maxPageIndex; pageIndex++) {
         const f = (callback) => {                                            // eslint-disable-line
-          url = util.getAlbumListUrl(artistId, pageIndex)
+          url = util.getAlbumListUrl(artist.id, pageIndex)
           util.getHtmlSourceCodeWithGetMethod(url).then(async (b) => {
             const promiseTasks = []
             $ = cheerio.load(b, { decodeEntities: false })
@@ -37,7 +37,8 @@ class AlbumList {
               const albumRegistration = {}
               albumRegistration.id = albumId
               albumRegistration.name = $('.tit').html()
-              albumRegistration.artistId = artistId
+              albumRegistration.artistId = artist.id
+              albumRegistration.artistName = artist.name
               promiseTasks.push(
                 redisWrapper.storeInRedis('album_registration_set', `alist-${albumId}`, albumRegistration)
               )
@@ -69,6 +70,9 @@ class AlbumList {
     const allArtistRegistrationKeys = await smembersAsync('artist_registration_set')
     for (let i = 0; i < allArtistRegistrationKeys.length; i++) {
       const artistInfo = await hgetallAsync(allArtistRegistrationKeys[i])
+      if (!artistInfo) {
+        continue
+      }
       const dataDateItemName = `album-list-${artistInfo.id}`
       const lastUpdateDate = await hgetAsync('data_date_info_hash', dataDateItemName)
       const shouldUpdate = util.ifShouldUpdateData(lastUpdateDate)
@@ -77,7 +81,7 @@ class AlbumList {
       }
       const f = (callback) => {
         const index = i + 1
-        this.getAlbumListForArtist(artistInfo.id, index, allArtistRegistrationKeys.length, () => {
+        this.getAlbumListForArtist(artistInfo, index, allArtistRegistrationKeys.length, () => {
           util.updateDataDateInfo(dataDateItemName)
           callback()
         })

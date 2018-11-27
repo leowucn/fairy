@@ -3,6 +3,7 @@ import dateFormat from 'dateformat'
 import autoBind from 'auto-bind'
 import { createStream } from 'table';
 import _ from 'lodash';
+import Telnet from 'telnet-client'
 
 import serverConfig from '../src/config'
 import { hsetAsync } from '../src/redis'
@@ -80,15 +81,15 @@ class Util {
   }
 
   getHtmlSourceCodeWithGetMethod(url) {
-    delete process.env.http_proxy;
-    delete process.env.HTTP_PROXY;
-    delete process.env.https_proxy;
-    delete process.env.HTTPS_PROXY;
-    serverConfig.options.url = url
-    return axios(serverConfig.options).then((response) => {
-      return response.data
-    }, (err) => {
-      return this.errMsg(err)
+    return new Promise(async (resolve) => {
+      // delete process.env.http_proxy;
+      // delete process.env.HTTP_PROXY;
+      // delete process.env.https_proxy;
+      // delete process.env.HTTPS_PROXY;
+
+      serverConfig.options.url = url
+      const response = await axios(serverConfig.options)
+      resolve(response.data)
     })
   }
 
@@ -126,8 +127,23 @@ class Util {
     return time.slice(0, 19)
   }
 
+  /**
+   *
+   * @param {*} date  上次抓取数据的时间
+   */
   ifShouldUpdateData(date) {
     if (new Date().getTime() - date < serverConfig.updateDbInterval) {
+      return false
+    }
+    return true
+  }
+
+  /**
+   *
+   * @param {} date  上次抓取歌手列表的时间，这个列表应该很少变化，所以可以隔比较长的时间再重新抓取
+   */
+  ifShouldUpdateArtistListData(date) {
+    if (new Date().getTime() - date < serverConfig.updateDbArtistListInterval) {
       return false
     }
     return true

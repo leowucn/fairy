@@ -16,19 +16,15 @@ class AlbumMusic {
       const promiseTasks = []
       const $ = cheerio.load(response, { decodeEntities: false })
       $('#song-list-pre-cache').find('a').each(async function (i, elem) {
-        const allArtistRegistrationKeys = await smembersAsync('artist_registration_set')
-        for (let j = 0; j < allArtistRegistrationKeys.length; j++) {
-          const artistInfo = await hgetallAsync(allArtistRegistrationKeys[j])
-          const musicId = util.getNumberStringFromString($(this).attr('href'))
-          const musicRegistration = {}
-          musicRegistration.id = musicId
-          musicRegistration.name = $(this).html()
-          musicRegistration.artistId = album.artistId
-          musicRegistration.artistName = artistInfo.name
-          promiseTasks.push(
-            redisWrapper.storeInRedis('music_registration_set', `mugis-${musicId}`, musicRegistration)
-          )
-        }
+        const musicId = util.getNumberStringFromString($(this).attr('href'))
+        const musicRegistration = {}
+        musicRegistration.id = musicId
+        musicRegistration.name = $(this).html()
+        musicRegistration.artistId = album.artistId
+        musicRegistration.artistName = album.artistName
+        promiseTasks.push(
+          redisWrapper.storeInRedis('music_registration_set', `mugis-${musicId}`, musicRegistration)
+        )
       });
       util.beautifulPrintMsgV2('获取专辑音乐清单', `外部遍历序号: ${index}`, `总数: ${total}`, `${album.name}`)
       await bluebird.Promise.all(promiseTasks)
@@ -49,7 +45,7 @@ class AlbumMusic {
       if (!shouldUpdate) {
         continue
       }
-      const f = (callback) => {          // eslint-disable-line
+      const f = async (callback) => {          // eslint-disable-line
         currentThis.getMusicListOfAlbum(album, i + 1, allAlbumRegistrationKeys.length, () => {
           util.updateDataDateInfo(dataDateItemName)
           callback()

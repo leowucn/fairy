@@ -62,7 +62,8 @@
     "redux-thunk": "^2.1.0",
     "sanitize-html": "^1.11.4",
     "superagent": "^3.8.3",
-    "table": "^5.1.0"
+    "table": "^5.1.0",
+    "telnet-client": "^0.16.1"
   },
   "devDependencies": {
     "ava": "^0.15.2",

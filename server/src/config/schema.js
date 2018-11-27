@@ -44,7 +44,7 @@ const musicRegistration = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_MUS
 const artistRegistration = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_ARTIST_REGISTRATION, new Schema({
   id: { type: 'String', required: true },                 // 歌手id
   name: { type: 'String', required: true },               // 歌手名称
-  fanCount: { type: 'Number', required: false },         // 歌手粉丝数
+  fanCount: { type: 'Number', required: false },          // 歌手粉丝数
   artistClass: { type: 'String', required: true },        // 所属歌手类别分类，地址后缀形式表示
 }, {
   versionKey: false, // You should be aware of the outcome after set to false
@@ -54,7 +54,8 @@ const artistRegistration = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_AR
 const albumRegistration = mongoose.model(serverConfig.COLLECTIONS.COLLECTION_ALBUM_REGISTRATION, new Schema({
   id: { type: 'String', required: true },                // 专辑id
   name: { type: 'String', required: true },              // 专辑名称
-  artistId: { type: 'String', required: true },          // 所属歌手类别分类，地址后缀形式表示
+  artistId: { type: 'String', required: true },          // 歌手id
+  artistName: { type: 'String', required: true },        // 歌手名字
 }, {
   versionKey: false, // You should be aware of the outcome after set to false
 }));
