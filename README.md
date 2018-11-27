@@ -2,7 +2,13 @@
 
 
 
-# Fairy
+# 
+
+![mindfulness (1)](./resource/mindfulness.png)
+
+​																Icon made by [Freepik]([http://www.freepik.com](http://www.freepik.com/))
+
+#Fairy
 
 ## 原因
 
@@ -12,7 +18,7 @@
 
 最后，这个项目是我为了练手nodejs和react使用的，所以项目难免有bug或者不好用的地方。当然也在努力朝着产品化的方向发展。欢迎提出pull request，感谢之至！
 
-# 开发
+## 开发
 
 这个项目使用到的技术包括：react、nodejs、redis、mongodb，框架是[mern-starter](https://github.com/Hashnode/mern-starter).
 
