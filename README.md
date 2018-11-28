@@ -41,5 +41,4 @@ Icon made by [Freepik](http://www.freepik.com/)
 
 数据抓取下来以后暂时是放在redis里的，可以看出系统负载压力还可以接受。
 
-![ScreenShot4](/Users/wupeng/work/myself/fairy/resource/ScreenShot4.png)
-
+![ScreenShot4](./resource/ScreenShot4.png)
