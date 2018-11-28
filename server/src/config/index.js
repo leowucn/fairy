@@ -13,11 +13,11 @@ const config = {
   redisURL: process.env.REDIS_URL || 'redis://localhost:6379',
   port: process.env.PORT || 9528,
 
-  bulkOperationInterval: 1000 * 60,                     // 每隔指定秒数扫描redis，把数据存放到mongodb，间隔太短，容易导致mongodb占用cpu使用率高过
+  bulkOperationInterval: 1000 * 25,                     // 每隔指定秒数扫描redis，把数据存放到mongodb，间隔太短，容易导致mongodb占用cpu使用率高过
   bulkOperationNum: 2000,                               // 批量处理的数目
 
   countOfHotCommentThreshold: 10000,                    // 设置评论抓取条件，对于热评数大于这个值的音乐才抓取评论，否则抓取太多会过于占用磁盘空间
-  countOfCommentFavorThreshold: 10000,                  // 抓取评论时，之抓取点赞数大于这个值得评论
+  countOfCommentFavorThreshold: 10000,                  // 抓取评论时，只抓取点赞数大于这个值的评论
   // 对于页数类型的参数配置，-1表示没有限制
   maxPageIndexForPlaylist: -1,                          // 要抓取的歌单最大页数
   maxPageIndexForAlbum: -1,                             // 要抓取歌手的专辑的最大页数
@@ -25,9 +25,9 @@ const config = {
   maxConcurrentNumOfMusicForGetMusicInfo: 60,           // 并发更新音乐评论数的歌曲数目
   maxConcurrentNumGetArtistInfo: 1,                     // 并发获取歌手信息的数目
   maxConcurrentNumOfSingerForGetAlbum: 60,              // 要并发抓取专辑的歌手的数目
-  maxConcurrentNumOfAlbumsForGetMusicInfo: 60,          // 要并发从专辑抓取歌曲信息的最大专辑数目
-  updateDbInterval: 1000 * 3600 * 24 * 5,               // 隔多少毫秒后更新本地数据库
-  updateDbArtistListInterval: 1000 * 3600 * 24 * 60,    // 隔多少毫秒后更新歌手清单。歌手列表应该不会有很大变化，可以隔比较长的时间再重新抓取
+  maxConcurrentNumOfAlbumsForGetMusicInfo: 10000,         // 要并发从专辑抓取歌曲信息的最大专辑数目
+  updateDbInterval: 1000 * 3600 * 24 * 90,               // 隔多少毫秒后更新本地数据库
+  updateDbArtistListInterval: 1000 * 3600 * 24 * 90,    // 隔多少毫秒后更新歌手清单。歌手列表应该不会有很大变化，可以隔比较长的时间再重新抓取
   musicCountPerPage: 100,                               // 给客户端每次请求排行榜显示多少数据
 
   options: {
@@ -35,13 +35,11 @@ const config = {
     responseType: 'json',
     header: {
       Referer: 'http://music.163.com/',
-      Host: 'music.163.com',
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36',
       Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     },
     // proxy: {
-    //   host: '127.0.0.1',
-    //   port: 1087,
+    //   host: '118.175.93.107',
+    //   port: 43818,
     // },
   },
   artistPrefixOfName: ['0', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
@@ -58,8 +56,7 @@ const config = {
   // ---------------------------------------------------------------
 
    /**
-   * 要抓取的网易云音乐根url
-   */
+   * 要抓取的网易云音乐根url */
   URL: {
     URL_ROOT_LIST: 'http://music.163.com',                                                        // 网易云音乐根url
     URL_MUSIC_STYLE: 'http://music.163.com/discover/playlist/?order=hot&cat=',                    // 网易云音乐音乐风格根url

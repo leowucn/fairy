@@ -19,8 +19,9 @@ const playlistPropertySchema = new Schema({
   playlistMusicCount: { type: 'Number', required: true }, // 歌单包含音乐的数目
   playCount: { type: 'Number', required: true },          // 歌单播放次数
   commentCount: { type: 'Number', required: true },       // 歌单评论次数
-  collectCount: { type: 'Number', required: true },       // 歌单收藏次数
-  createTime: { type: 'Number', required: true },
+  shareCount: { type: 'Number', required: true },         // 歌单分享次数
+  subscribedCount: { type: 'Number', required: true },    // 歌单订阅次数
+  createTime: { type: 'Number', required: true },         // 歌单创建时间
 }, {
   versionKey: false, // You should be aware of the outcome after set to false
 });

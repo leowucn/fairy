@@ -2,6 +2,7 @@ import axios from 'axios'
 import dateFormat from 'dateformat'
 import autoBind from 'auto-bind'
 import { createStream } from 'table';
+import UserAgent from 'user-agents';
 
 import serverConfig from '../src/config'
 import { hsetAsync } from '../src/redis'
@@ -77,6 +78,7 @@ class Util {
   getHtmlSourceCodeWithGetMethod(url) {
     return new Promise(async (resolve) => {
       serverConfig.options.url = url
+      serverConfig.options.header['User-Agent'] = this.generateRandomUserAgent()
       const response = await axios(serverConfig.options)
       resolve(response.data)
     })
@@ -114,6 +116,11 @@ class Util {
     const now = new Date();
     const time = dateFormat(now, 'isoDateTime');
     return time.slice(0, 19)
+  }
+
+  generateRandomUserAgent() {
+    const userAgent = new UserAgent();
+    return userAgent.toString()
   }
 
   /**

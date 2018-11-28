@@ -12,55 +12,56 @@ class AlbumList {
     autoBind(this)
   }
 
-  getAlbumListForArtist(artist, index, total, outerCallback) {
+  async getAlbumListForArtist(artist, index, total, outerCallback) {
     let url = util.getAlbumListUrl(artist.id, 0)
-    util.getHtmlSourceCodeWithGetMethod(url).then((response) => {
-      let $ = cheerio.load(response, { decodeEntities: false })
-      const aSize = $('div[class=u-page]').find('a').length
-      let maxPageIndex = 1
-      $('div[class=u-page]').find('a').each(function (i, elem) {
-        if (i === aSize - 2) {
-          maxPageIndex = Number($(this).html())
-        }
-      });
-      maxPageIndex = serverConfig.maxPageIndexForAlbum <= 0 ? maxPageIndex : serverConfig.maxPageIndexForAlbum
-      const tasks = []
-      for (let pageIndex = 1; pageIndex <= maxPageIndex; pageIndex++) {
-        const f = (callback) => {                                            // eslint-disable-line
-          url = util.getAlbumListUrl(artist.id, pageIndex)
-          util.getHtmlSourceCodeWithGetMethod(url).then(async (b) => {
-            const promiseTasks = []
-            $ = cheerio.load(b, { decodeEntities: false })
-            $('#m-song-module').find('li').each(function (i, elem) {
-              $ = cheerio.load(this, { decodeEntities: false })
-              const albumId = util.getNumberStringFromString($('.tit').attr('href'))
-              const albumRegistration = {}
-              albumRegistration.id = albumId
-              albumRegistration.name = $('.tit').html()
-              albumRegistration.artistId = artist.id
-              albumRegistration.artistName = artist.name
-              promiseTasks.push(
-                redisWrapper.storeInRedis('album_registration_set', `alist-${albumId}`, albumRegistration)
-              )
-              util.beautifulPrintMsgV2('获取专辑条目', `外部遍历序号: ${index}`, `总数: ${total}`, `${albumRegistration.name}`)
-            });
-            await bluebird.Promise.all(promiseTasks)
-            callback()
-          }).catch((err) => {
-            util.errMsg(err)
-          })
-        }
-        tasks.push(f)
+    const response = await util.getHtmlSourceCodeWithGetMethod(url)
+    let $ = cheerio.load(response, { decodeEntities: false })
+    const aSize = $('div[class=u-page]').find('a').length
+    let maxPageIndex = 1
+    $('div[class=u-page]').find('a').each(function (i, elem) {
+      if (i === aSize - 2) {
+        maxPageIndex = Number($(this).html())
       }
-      async.parallel(tasks, (err) => {
-        if (err) {
-          util.errMsg(err)
-          return
+    });
+    maxPageIndex = serverConfig.maxPageIndexForAlbum <= 0 ? maxPageIndex : serverConfig.maxPageIndexForAlbum
+    const tasks = []
+    for (let pageIndex = 1; pageIndex <= maxPageIndex; pageIndex++) {
+      const f = async (callback) => {                                            // eslint-disable-line
+        url = util.getAlbumListUrl(artist.id, pageIndex)
+        const b = await util.getHtmlSourceCodeWithGetMethod(url)
+        const promiseTasks = []
+        $ = cheerio.load(b, { decodeEntities: false })
+        $('#m-song-module').find('li').each(function (i, elem) {
+          $ = cheerio.load(this, { decodeEntities: false })
+          const albumId = util.getNumberStringFromString($('.tit').attr('href'))
+          const albumRegistration = {}
+          albumRegistration.id = albumId
+          albumRegistration.name = $('.tit').html()
+          albumRegistration.artistId = artist.id
+          albumRegistration.artistName = artist.name
+          promiseTasks.push(
+            redisWrapper.storeInRedis('album_registration_set', `alist-${albumId}`, albumRegistration)
+          )
+          util.beautifulPrintMsgV2('获取专辑条目', `外部遍历序号: ${index}`, `总数: ${total}`, `${albumRegistration.name}`)
+        });
+        // 如果网易启用了反爬虫机制，那么就抓取不到数据了。相应的歌手的专辑应该再其他时间段继续抓取
+        if (promiseTasks.length) {
+          await bluebird.Promise.all(promiseTasks)
+          callback()
+        } else {
+          if (b.includes('暂无专辑')) {
+            callback()
+          }
         }
-        outerCallback()
-      })
-    }).catch((err) => {
-      util.errMsg(err)
+      }
+      tasks.push(f)
+    }
+    async.parallel(tasks, (err) => {
+      if (err) {
+        util.errMsg(err)
+        return
+      }
+      outerCallback()
     })
   }
 

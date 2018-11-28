@@ -22,15 +22,21 @@ class PlaylistProperty {
     const playlistUrl = serverConfig.URL.URL_MUSIC.concat(util.getNumberStringFromString(playlistInfo.playlist))
     const htmlSourceCode = await util.getHtmlSourceCodeWithGetMethod(playlistUrl)
     const resObj = htmlSourceCode.result
+    if (!resObj) {
+      // 可能歌单被删除，可以直接忽略，下次更新了歌单列表就行了
+      outerCallback()
+      return
+    }
 
     const playlistProperty = {}
     playlistProperty.title = playlistInfo.title
     playlistProperty.playlist = playlistInfo.playlist
     playlistProperty.introduction = resObj.description
     playlistProperty.playlistMusicCount = playlistMusicCount
-    playlistProperty.playCount = Number(resObj.playCount)
-    playlistProperty.commentCount = Number(resObj.commentCount)
-    playlistProperty.collectCount = resObj.shareCount
+    playlistProperty.playCount = Number(resObj.playCount || 0)
+    playlistProperty.commentCount = Number(resObj.commentCount || 0)
+    playlistProperty.shareCount = Number(resObj.shareCount || 0)
+    playlistProperty.subscribedCount = Number(resObj.subscribedCount || 0)
     playlistProperty.createTime = resObj.createTime
     util.beautifulPrintMsgV2('获取歌单信息', `外部遍历序号: ${index}`, `总数: ${total}`, `${playlistInfo.title}`)
     await redisWrapper.storeInRedis('playlist_property_set', `prepty-${playlistInfo.playlist}`, playlistProperty)
@@ -48,6 +54,7 @@ class PlaylistProperty {
 
   /**
    * 更新所有歌单的属性信息
+   * 因为一个歌单可能会在多个音乐风格里出现，所以playlistproperties表的记录数必然小于等于playlistinfos表的记录数
    */
   async callUpdateAllPlaylistProperty(outerCallback) {
     const currentThis = this
