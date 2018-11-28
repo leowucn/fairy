@@ -35,10 +35,11 @@ Icon made by [Freepik](http://www.freepik.com/)
 
 ![ScreenShot3](./resource/ScreenShot3.png)
 
+同时，代码里```./server/src/config/index.js```有关于抓取时并发量的设置，默认并发数是60。
+
+![ScreenShot5](./resource/ScreenShot5.png)
+
 数据抓取下来以后暂时是放在redis里的，可以看出系统负载压力还可以接受。
 
 ![ScreenShot4](/Users/wupeng/work/myself/fairy/resource/ScreenShot4.png)
 
-同时，代码里```./server/src/config/index.js```有关于抓取时并发量的设置，默认并发数是60。
-
-![ScreenShot5](/Users/wupeng/work/myself/fairy/resource/ScreenShot5.png)

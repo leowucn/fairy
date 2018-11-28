@@ -27,7 +27,7 @@ const config = {
   maxConcurrentNumOfSingerForGetAlbum: 60,              // 要并发抓取专辑的歌手的数目
   maxConcurrentNumOfAlbumsForGetMusicInfo: 60,          // 要并发从专辑抓取歌曲信息的最大专辑数目
   updateDbInterval: 1000 * 3600 * 24 * 5,               // 隔多少毫秒后更新本地数据库
-  updateDbArtistListInterval: 1000 * 3600 * 24 * 60,    // 隔多少毫秒后更新本地数据库
+  updateDbArtistListInterval: 1000 * 3600 * 24 * 60,    // 隔多少毫秒后更新歌手清单。歌手列表应该不会有很大变化，可以隔比较长的时间再重新抓取
   musicCountPerPage: 100,                               // 给客户端每次请求排行榜显示多少数据
 
   options: {
