@@ -12,7 +12,7 @@ import redisWrapper from './redis'
 
 
 export async function runSpider() {
-  // await redisWrapper.deleteHashMembersWithStartsString('data_date_info_hash', 'playlist-')
+  // await redisWrapper.deleteHashMembersWithStartsString('data_date_info_hash', 'album-list-')
   const processStags = [
     redisWrapper.loadToRedis,                             // 加载时间信息到redis
 

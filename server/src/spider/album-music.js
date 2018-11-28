@@ -27,8 +27,12 @@ class AlbumMusic {
         )
       });
       util.beautifulPrintMsgV2('获取专辑音乐清单', `外部遍历序号: ${index}`, `总数: ${total}`, `${album.name}`)
-      await bluebird.Promise.all(promiseTasks)
-      outerCallback()
+      if (promiseTasks.length > 0) {     // 及早暂停，因为网易有可能返回空网页，可以再其他时间段继续抓取
+        await bluebird.Promise.all(promiseTasks)
+        outerCallback()
+      } else {
+        console.log('albumUrl = ', albumUrl)
+      }
     })
   }
 

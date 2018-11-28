@@ -13,7 +13,7 @@ const config = {
   redisURL: process.env.REDIS_URL || 'redis://localhost:6379',
   port: process.env.PORT || 9528,
 
-  bulkOperationInterval: 1000 * 15,                     // 每隔指定秒数扫描redis，把数据存放到mongodb，间隔太短，容易导致mongodb占用cpu使用率高过
+  bulkOperationInterval: 1000 * 60,                     // 每隔指定秒数扫描redis，把数据存放到mongodb，间隔太短，容易导致mongodb占用cpu使用率高过
   bulkOperationNum: 2000,                               // 批量处理的数目
 
   countOfHotCommentThreshold: 10000,                    // 设置评论抓取条件，对于热评数大于这个值的音乐才抓取评论，否则抓取太多会过于占用磁盘空间
@@ -39,10 +39,10 @@ const config = {
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36',
       Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     },
-    proxy: {
-      host: '127.0.0.1',
-      port: 1087,
-    },
+    // proxy: {
+    //   host: '127.0.0.1',
+    //   port: 1087,
+    // },
   },
   artistPrefixOfName: ['0', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
 

@@ -2,8 +2,6 @@ import axios from 'axios'
 import dateFormat from 'dateformat'
 import autoBind from 'auto-bind'
 import { createStream } from 'table';
-import _ from 'lodash';
-import Telnet from 'telnet-client'
 
 import serverConfig from '../src/config'
 import { hsetAsync } from '../src/redis'
@@ -56,10 +54,6 @@ class Util {
     return encodeURI(url)
   }
 
-  getPlaylistUrl(playlistPostfix) {
-    return encodeURI(serverConfig.URL.URL_ROOT_LIST.concat(playlistPostfix.trim()))
-  }
-
   getMusicCommentUrl(id) {
     return serverConfig.URL.URL_COMMENT_V2.concat(id)
   }
@@ -82,11 +76,6 @@ class Util {
 
   getHtmlSourceCodeWithGetMethod(url) {
     return new Promise(async (resolve) => {
-      // delete process.env.http_proxy;
-      // delete process.env.HTTP_PROXY;
-      // delete process.env.https_proxy;
-      // delete process.env.HTTPS_PROXY;
-
       serverConfig.options.url = url
       const response = await axios(serverConfig.options)
       resolve(response.data)
@@ -151,12 +140,6 @@ class Util {
 
   updateDataDateInfo(name) {
     hsetAsync('data_date_info_hash', name, new Date().getTime())
-  }
-
-  millisToMinutesAndSeconds(millis) {
-    const minutes = Math.floor(millis / 60000);
-    const seconds = ((millis % 60000) / 1000).toFixed(0);
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`
   }
 
 }

@@ -70,9 +70,6 @@ class AlbumList {
     const allArtistRegistrationKeys = await smembersAsync('artist_registration_set')
     for (let i = 0; i < allArtistRegistrationKeys.length; i++) {
       const artistInfo = await hgetallAsync(allArtistRegistrationKeys[i])
-      if (!artistInfo) {
-        continue
-      }
       const dataDateItemName = `album-list-${artistInfo.id}`
       const lastUpdateDate = await hgetAsync('data_date_info_hash', dataDateItemName)
       const shouldUpdate = util.ifShouldUpdateData(lastUpdateDate)
